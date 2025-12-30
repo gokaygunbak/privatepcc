@@ -1,0 +1,29 @@
+# System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Java / Maven
+target/
+*.class
+*.log
+.mvn/
+wrapper/
+
+# Node / JS
+node_modules/
+dist/
+build/
+coverage/
+.npm/
+
+# Environment / Secrets
+.env
+.env.*
+secrets.properties
+credentials.json
