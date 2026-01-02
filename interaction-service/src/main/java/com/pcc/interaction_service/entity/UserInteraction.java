@@ -28,7 +28,7 @@ public class UserInteraction {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum InteractionType {
-        LIKE, SAVE, VIEW
+        LIKE, SAVE, VIEW, REPORT
     }
 
     public UserInteraction() {

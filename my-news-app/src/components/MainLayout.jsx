@@ -9,8 +9,11 @@ import {
     Home as HomeIcon,
     Person as PersonIcon,
     Check as CheckIcon,
-    TrendingUp as TrendingIcon
+    TrendingUp as TrendingIcon,
+    Bookmark as BookmarkIcon,
+    AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
+import AuthService from '../services/AuthService';
 
 const drawerWidth = 240;
 
@@ -19,8 +22,7 @@ const MainLayout = ({ children, title = "🔍 Keşfet" }) => {
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        localStorage.removeItem("user_token");
-        localStorage.removeItem("user_id");
+        AuthService.logout();
         navigate("/");
     };
 
@@ -61,9 +63,19 @@ const MainLayout = ({ children, title = "🔍 Keşfet" }) => {
                     fullWidth
                     variant="text"
                     color="inherit"
+                    startIcon={<BookmarkIcon />}
+                    onClick={() => navigate("/saved")}
+                    sx={{ justifyContent: 'flex-start', mb: 1, color: 'text.secondary', '&:hover': { color: 'secondary.main', bgcolor: 'rgba(156, 39, 176, 0.1)' } }}
+                >
+                    Kaydedilenler
+                </Button>
+                <Button
+                    fullWidth
+                    variant="text"
+                    color="inherit"
                     startIcon={<CheckIcon />}
                     onClick={() => navigate("/onboarding")}
-                    sx={{ justifyContent: 'flex-start', color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(3, 136, 166, 0.1)' } }}
+                    sx={{ justifyContent: 'flex-start', mb: 1, color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(3, 136, 166, 0.1)' } }}
                 >
                     İlgi Alanlarım
                 </Button>
@@ -73,10 +85,24 @@ const MainLayout = ({ children, title = "🔍 Keşfet" }) => {
                     color="inherit"
                     startIcon={<PersonIcon />}
                     onClick={() => navigate("/profile")}
-                    sx={{ justifyContent: 'flex-start', color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(3, 136, 166, 0.1)' } }}
+                    sx={{ justifyContent: 'flex-start', mb: 1, color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(3, 136, 166, 0.1)' } }}
                 >
                     Profilim
                 </Button>
+                
+                {/* Admin butonu - sadece ADMIN rolü için görünür */}
+                {AuthService.isAdmin() && (
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        color="error"
+                        startIcon={<AdminIcon />}
+                        onClick={() => navigate("/admin")}
+                        sx={{ justifyContent: 'flex-start', mt: 2 }}
+                    >
+                        Admin Paneli
+                    </Button>
+                )}
             </Box>
         </Box>
     );

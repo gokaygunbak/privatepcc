@@ -186,18 +186,136 @@ public class UserPreferenceService {
         };
     }
 
-    // Kişiselleştirilmiş Akışı Getir
+    // Kişiselleştirilmiş Akışı Getir (Ağırlıklı Rastgele Seçim Algoritması)
     public List<SummaryDto> getPersonalizedFeed(Long userId) {
-        //  Kullanıcının sevdiği konuların ID'lerini çek
-        List<Integer> topicIds = preferenceRepository.findTopicIdsByUserId(userId);
-
-        // Eğer hiç tercihi yoksa boş liste
-        if (topicIds.isEmpty()) {
+        // 1. Kullanıcının topic skorlarını çek (en yüksekten en düşüğe)
+        List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
+        
+        if (userScores.isEmpty()) {
+            System.out.println("📭 Kullanıcı " + userId + " için hiç skor bulunamadı.");
             return List.of();
         }
 
-        // LLM Servisini ara ve bu ID'lere ait haberleri iste
-        return llmServiceClient.getSummariesByTopics(topicIds);
+        // 2. Topic ID'lerini çıkar
+        List<Integer> topicIds = userScores.stream()
+                .map(UserTopicScore::getTopicId)
+                .collect(java.util.stream.Collectors.toList());
+
+        // 3. Toplam skoru hesapla
+        double totalScore = userScores.stream()
+                .mapToDouble(UserTopicScore::getScore)
+                .sum();
+
+        // 4. Yüzdelikleri hesapla ve logla
+        System.out.println("📊 Kullanıcı " + userId + " için ağırlıklı dağılım:");
+        for (UserTopicScore score : userScores) {
+            double percentage = (score.getScore() / totalScore) * 100;
+            System.out.println("   Topic " + score.getTopicId() + ": " + 
+                    String.format("%.1f", score.getScore()) + " puan → %" + 
+                    String.format("%.1f", percentage));
+        }
+
+        // 5. LLM Servisinden bu topic'lere ait içerikleri al
+        List<SummaryDto> allSummaries = llmServiceClient.getSummariesByTopics(topicIds);
+
+        if (allSummaries.isEmpty()) {
+            System.out.println("📭 Bu topic'lere ait içerik bulunamadı.");
+            return List.of();
+        }
+
+        // 6. İçerikleri topic'lerine göre grupla
+        java.util.Map<Integer, List<SummaryDto>> summariesByTopic = allSummaries.stream()
+                .filter(s -> s.getTopicId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(SummaryDto::getTopicId));
+
+        // 7. Ağırlıklı rastgele seçim ile feed oluştur
+        List<SummaryDto> personalizedFeed = buildWeightedFeed(userScores, summariesByTopic, totalScore, allSummaries.size());
+
+        System.out.println("✅ " + personalizedFeed.size() + " içerik ağırlıklı algoritma ile sıralandı.");
+        return personalizedFeed;
+    }
+
+    /**
+     * Ağırlıklı Rastgele Seçim Algoritması
+     * - İlk içerik: Kesinlikle en yüksek skorlu topic'ten
+     * - Sonraki içerikler: Skorlara göre yüzdelik olasılıkla seçilir
+     */
+    private List<SummaryDto> buildWeightedFeed(
+            List<UserTopicScore> userScores,
+            java.util.Map<Integer, List<SummaryDto>> summariesByTopic,
+            double totalScore,
+            int maxItems) {
+        
+        List<SummaryDto> result = new java.util.ArrayList<>();
+        java.util.Random random = new java.util.Random();
+        
+        // Her topic için kullanılan index'leri takip et (aynı içerik tekrar gelmesin)
+        java.util.Map<Integer, Integer> topicIndices = new java.util.HashMap<>();
+        for (Integer topicId : summariesByTopic.keySet()) {
+            topicIndices.put(topicId, 0);
+        }
+
+        // İlk içerik: Kesinlikle en yüksek skorlu topic'ten
+        if (!userScores.isEmpty()) {
+            Integer topTopicId = userScores.get(0).getTopicId();
+            List<SummaryDto> topTopicSummaries = summariesByTopic.get(topTopicId);
+            if (topTopicSummaries != null && !topTopicSummaries.isEmpty()) {
+                result.add(topTopicSummaries.get(0));
+                topicIndices.put(topTopicId, 1);
+                System.out.println("🥇 İlk içerik: Topic " + topTopicId + " (En yüksek skor)");
+            }
+        }
+
+        // Kalan içerikler: Ağırlıklı rastgele seçim
+        int attempts = 0;
+        int maxAttempts = maxItems * 3; // Sonsuz döngüyü önle
+        
+        while (result.size() < maxItems && attempts < maxAttempts) {
+            attempts++;
+            
+            // Rastgele bir topic seç (skorlara göre ağırlıklı)
+            Integer selectedTopicId = selectWeightedTopic(userScores, totalScore, random);
+            
+            if (selectedTopicId == null) continue;
+            
+            List<SummaryDto> topicSummaries = summariesByTopic.get(selectedTopicId);
+            if (topicSummaries == null) continue;
+            
+            int currentIndex = topicIndices.getOrDefault(selectedTopicId, 0);
+            
+            // Bu topic'te hala içerik var mı?
+            if (currentIndex < topicSummaries.size()) {
+                SummaryDto summary = topicSummaries.get(currentIndex);
+                
+                // Daha önce eklenmemişse ekle
+                if (!result.contains(summary)) {
+                    result.add(summary);
+                    topicIndices.put(selectedTopicId, currentIndex + 1);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Skorlara göre ağırlıklı topic seçimi
+     * Örnek: Futbol 35, Motor 10, Gastro 5 → Toplam 50
+     * Random 0-50 arası: 0-35 → Futbol, 35-45 → Motor, 45-50 → Gastro
+     */
+    private Integer selectWeightedTopic(List<UserTopicScore> userScores, double totalScore, java.util.Random random) {
+        double randomValue = random.nextDouble() * totalScore;
+        double cumulative = 0;
+        
+        for (UserTopicScore score : userScores) {
+            cumulative += score.getScore();
+            if (randomValue <= cumulative) {
+                return score.getTopicId();
+            }
+        }
+        
+        // Fallback: İlk topic
+        return userScores.isEmpty() ? null : userScores.get(0).getTopicId();
     }
 
     // Kullanıcının Seçtiği İlgi Alanlarını Getir (Profil sayfası için)
@@ -216,5 +334,82 @@ public class UserPreferenceService {
         return allTopics.stream()
                 .filter(topic -> userTopicIds.contains(topic.getTopicId()))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    // Kullanıcının Kaydettiği İçerikleri Getir
+    public List<SummaryDto> getSavedContents(Long userId) {
+        // 1. Kullanıcının SAVE tipi interaction'larını al (en son kaydedilen en üstte)
+        List<UserInteraction> savedInteractions = interactionRepository
+                .findByUserIdAndInteractionTypeOrderByCreatedAtDesc(userId, UserInteraction.InteractionType.SAVE);
+
+        if (savedInteractions.isEmpty()) {
+            System.out.println("📭 Kullanıcı " + userId + " hiç içerik kaydetmemiş.");
+            return List.of();
+        }
+
+        // 2. ContentId'leri sıralı olarak çıkar (kaydetme sırasına göre)
+        List<java.util.UUID> contentIds = savedInteractions.stream()
+                .map(UserInteraction::getContentId)
+                .collect(java.util.stream.Collectors.toList());
+
+        System.out.println("📚 Kullanıcı " + userId + " için " + contentIds.size() + " kayıtlı içerik bulundu.");
+
+        // 3. LLM Service'den summary'leri çek
+        List<SummaryDto> summaries = llmServiceClient.getSummariesByContentIds(contentIds);
+
+        // 4. Summary'leri kaydetme sırasına göre sırala (contentIds sırasına göre)
+        java.util.Map<java.util.UUID, SummaryDto> summaryMap = summaries.stream()
+                .filter(s -> s.getContent() != null && s.getContent().getContentId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        s -> s.getContent().getContentId(),
+                        s -> s,
+                        (existing, replacement) -> existing // duplicate durumunda ilkini tut
+                ));
+
+        // ContentIds sırasına göre summary'leri döndür
+        return contentIds.stream()
+                .map(summaryMap::get)
+                .filter(s -> s != null)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    // Admin: Şikayet Edilen İçerikleri Getir
+    public List<SummaryDto> getReportedContents() {
+        // 1. Tüm REPORT tipindeki interaction'ları al
+        List<UserInteraction> reportInteractions = interactionRepository
+                .findByInteractionTypeOrderByCreatedAtDesc(UserInteraction.InteractionType.REPORT);
+
+        if (reportInteractions.isEmpty()) {
+            System.out.println("📭 Hiç şikayet edilen içerik yok.");
+            return List.of();
+        }
+
+        // 2. Unique contentId'leri çıkar (aynı içerik birden fazla şikayet edilmiş olabilir)
+        List<java.util.UUID> contentIds = reportInteractions.stream()
+                .map(UserInteraction::getContentId)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+
+        System.out.println("⚠️ " + contentIds.size() + " farklı içerik şikayet edilmiş.");
+
+        // 3. LLM Service'den summary'leri çek
+        List<SummaryDto> summaries = llmServiceClient.getSummariesByContentIds(contentIds);
+
+        // 4. Her summary'ye şikayet sayısını ekle (DTO'da reportCount alanı varsa)
+        return summaries;
+    }
+
+    // Admin: İçeriği ve İlişkili Tüm Verileri Sil
+    @Transactional
+    public void deleteContentCompletely(java.util.UUID contentId) {
+        System.out.println("🗑️ İçerik siliniyor: " + contentId);
+
+        // 1. Bu içeriğe ait tüm interaction'ları sil (LIKE, SAVE, VIEW, REPORT)
+        interactionRepository.deleteByContentId(contentId);
+        System.out.println("   ✓ Interaction'lar silindi");
+
+        // 2. LLM Service'e içeriği silmesini söyle
+        llmServiceClient.deleteContent(contentId);
+        System.out.println("   ✓ İçerik LLM Service'den silindi");
     }
 }

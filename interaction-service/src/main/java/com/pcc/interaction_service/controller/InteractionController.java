@@ -5,6 +5,8 @@ import com.pcc.interaction_service.dto.SummaryDto;
 import com.pcc.interaction_service.dto.TopicDto;
 import com.pcc.interaction_service.dto.PreferenceRequest;
 import com.pcc.interaction_service.client.LlmServiceClient;
+import com.pcc.interaction_service.entity.UserInteraction;
+import com.pcc.interaction_service.repository.UserInteractionRepository;
 import com.pcc.interaction_service.service.UserPreferenceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,16 +15,18 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/interactions")
-// @RequiredArgsConstructor
 public class InteractionController {
 
     private final UserPreferenceService preferenceService;
     private final LlmServiceClient llmServiceClient;
+    private final UserInteractionRepository interactionRepository;
 
     public InteractionController(UserPreferenceService preferenceService,
-            LlmServiceClient llmServiceClient) {
+            LlmServiceClient llmServiceClient,
+            UserInteractionRepository interactionRepository) {
         this.preferenceService = preferenceService;
         this.llmServiceClient = llmServiceClient;
+        this.interactionRepository = interactionRepository;
     }
 
     // Tüm Konuları Listele (Kullanıcı seçim yapsın diye)
@@ -66,6 +70,39 @@ public class InteractionController {
     public ResponseEntity<List<TopicDto>> getUserPreferences(@PathVariable Long userId) {
         List<TopicDto> userTopics = preferenceService.getUserSelectedTopics(userId);
         return ResponseEntity.ok(userTopics);
+    }
+
+    // Kullanıcının Kaydettiği İçerikleri Getir
+    @GetMapping("/saved/{userId}")
+    public ResponseEntity<List<SummaryDto>> getSavedContents(@PathVariable Long userId) {
+        List<SummaryDto> savedContents = preferenceService.getSavedContents(userId);
+        return ResponseEntity.ok(savedContents);
+    }
+
+    // Admin: Şikayet Edilen İçerikleri Getir
+    @GetMapping("/reports")
+    public ResponseEntity<List<SummaryDto>> getReportedContents() {
+        List<SummaryDto> reportedContents = preferenceService.getReportedContents();
+        return ResponseEntity.ok(reportedContents);
+    }
+
+    // Admin: İçeriği ve İlişkili Tüm Verileri Sil
+    @DeleteMapping("/content/{contentId}")
+    public ResponseEntity<String> deleteContent(@PathVariable java.util.UUID contentId) {
+        try {
+            preferenceService.deleteContentCompletely(contentId);
+            return ResponseEntity.ok("İçerik başarıyla silindi.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Silme hatası: " + e.getMessage());
+        }
+    }
+
+    // Admin: Toplam etkileşim sayısını getir (REPORT hariç)
+    @GetMapping("/stats/interaction-count")
+    public ResponseEntity<Long> getInteractionCount() {
+        // REPORT tipindeki etkileşimleri saymıyoruz
+        long count = interactionRepository.countByInteractionTypeNot(UserInteraction.InteractionType.REPORT);
+        return ResponseEntity.ok(count);
     }
 
 }

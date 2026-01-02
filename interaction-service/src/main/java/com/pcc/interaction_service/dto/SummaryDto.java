@@ -13,9 +13,13 @@ public class SummaryDto {
 
     // Haberin konusu puanlama için
     private Integer topicId;
+    private String topicName;
 
     // Haberin kaynağına gitmek için url
     private String sourceUrl;
+
+    // Content bilgisi (kaydetme sıralaması için)
+    private ContentDto content;
 
     public SummaryDto() {
     }
@@ -74,5 +78,34 @@ public class SummaryDto {
 
     public void setSourceUrl(String sourceUrl) {
         this.sourceUrl = sourceUrl;
+    }
+
+    public String getTopicName() {
+        return topicName;
+    }
+
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
+    }
+
+    public ContentDto getContent() {
+        return content;
+    }
+
+    public void setContent(ContentDto content) {
+        this.content = content;
+    }
+
+    // Nested Content DTO
+    public static class ContentDto {
+        private UUID contentId;
+
+        public UUID getContentId() {
+            return contentId;
+        }
+
+        public void setContentId(UUID contentId) {
+            this.contentId = contentId;
+        }
     }
 }

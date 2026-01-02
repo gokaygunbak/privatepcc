@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import {
-    AppBar, Toolbar, Typography, Button, Container, Grid, Card, CardContent, CardActions,
-    Chip, Box, IconButton, Drawer, Divider, Skeleton, Tooltip, Alert
+    Typography, Button, Container, Grid, Card, CardContent,
+    Chip, Box, IconButton, Skeleton, Tooltip, Alert
 } from '@mui/material';
 import {
     Favorite as FavoriteIcon,
     Bookmark as BookmarkIcon,
-    FavoriteBorder, BookmarkBorder
+    FavoriteBorder, BookmarkBorder,
+    Report as ReportIcon
 } from '@mui/icons-material';
 import AuthService from '../services/AuthService';
 import MainLayout from '../components/MainLayout';
@@ -24,6 +25,7 @@ function MyFeed() {
     // Interaction states
     const [likedPosts, setLikedPosts] = useState({});
     const [savedPosts, setSavedPosts] = useState({});
+    const [reportedPosts, setReportedPosts] = useState({});
 
     useEffect(() => {
         const token = AuthService.getCurrentToken();
@@ -61,12 +63,17 @@ function MyFeed() {
     };
 
     const handleInteraction = async (id, type, topicId) => {
-        console.log(`[Interaction] ID=${id}, Type=${type}, TopicID=${topicId}`); // DEBUG
+        console.log(`[Interaction] ID=${id}, Type=${type}, TopicID=${topicId}`);
         // Optimistic UI update
         if (type === 'LIKE') {
             setLikedPosts(prev => ({ ...prev, [id]: !prev[id] }));
         } else if (type === 'SAVE') {
             setSavedPosts(prev => ({ ...prev, [id]: !prev[id] }));
+        } else if (type === 'REPORT') {
+            if (!window.confirm("Bu içeriği şikayet etmek istediğinize emin misiniz?")) {
+                return;
+            }
+            setReportedPosts(prev => ({ ...prev, [id]: true }));
         }
 
         try {
@@ -74,7 +81,7 @@ function MyFeed() {
                 userId: AuthService.getCurrentUserId(),
                 contentId: id,
                 interactionType: type,
-                topicId: topicId // Puanlama için eklendi
+                topicId: topicId
             };
             console.log("[Interaction] Sending payload:", payload);
 
@@ -82,6 +89,10 @@ function MyFeed() {
                 headers: { Authorization: `Bearer ${AuthService.getCurrentToken()}` }
             });
             console.log("[Interaction] Success!");
+            
+            if (type === 'REPORT') {
+                alert("Şikayetiniz admin'e iletildi. Teşekkürler!");
+            }
         } catch (e) {
             console.error("Etkileşim kaydedilemedi", e);
         }
@@ -145,12 +156,25 @@ function MyFeed() {
                                         </Box>
                                     </CardContent>
                                     <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)', pl: 2 }}>
-                                        <IconButton onClick={() => handleInteraction(news.summaryId, 'LIKE', news.topicId)} color={likedPosts[news.summaryId] ? "error" : "default"}>
-                                            {likedPosts[news.summaryId] ? <FavoriteIcon /> : <FavoriteBorder />}
-                                        </IconButton>
-                                        <IconButton onClick={() => handleInteraction(news.summaryId, 'SAVE', news.topicId)} color={savedPosts[news.summaryId] ? "secondary" : "default"}>
-                                            {savedPosts[news.summaryId] ? <BookmarkIcon /> : <BookmarkBorder />}
-                                        </IconButton>
+                                        <Tooltip title="Beğen">
+                                            <IconButton onClick={() => handleInteraction(news.content?.contentId, 'LIKE', news.topicId)} color={likedPosts[news.content?.contentId] ? "error" : "default"}>
+                                                {likedPosts[news.content?.contentId] ? <FavoriteIcon /> : <FavoriteBorder />}
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Kaydet">
+                                            <IconButton onClick={() => handleInteraction(news.content?.contentId, 'SAVE', news.topicId)} color={savedPosts[news.content?.contentId] ? "secondary" : "default"}>
+                                                {savedPosts[news.content?.contentId] ? <BookmarkIcon /> : <BookmarkBorder />}
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Şikayet Et">
+                                            <IconButton 
+                                                onClick={() => handleInteraction(news.content?.contentId, 'REPORT', news.topicId)} 
+                                                color={reportedPosts[news.content?.contentId] ? "error" : "default"}
+                                                disabled={reportedPosts[news.content?.contentId]}
+                                            >
+                                                <ReportIcon />
+                                            </IconButton>
+                                        </Tooltip>
                                     </Box>
                                 </Card>
                             </Grid>

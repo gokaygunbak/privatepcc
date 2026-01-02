@@ -35,8 +35,9 @@ public class AuthService {
         Optional<User> userOpt = userRepository.findByUsername(username);
 
         if (userOpt.isPresent() && passwordEncoder.matches(password, userOpt.get().getPassword())) {
-            // Şifre doğruysa token üret
-            return jwtUtil.generateToken(username);
+            User user = userOpt.get();
+            // Şifre doğruysa token üret (role bilgisi ile)
+            return jwtUtil.generateToken(username, user.getRole());
         }
         return null;
     }

@@ -27,10 +27,12 @@ const login = async (username, password) => {
             console.log("Login Başarılı! Sunucudan gelen yanıt:", response.data);
             localStorage.setItem("user_token", response.data.token);
             if (response.data.userId) {
-                console.log("User ID kaydediliyor:", response.data.userId); // DEBUG
-                localStorage.setItem("user_id", response.data.userId); // ID'yi de sakla
-            } else {
-                console.error("UYARI: Sunucu yanıtında 'userId' bulunamadı!", response.data);
+                console.log("User ID kaydediliyor:", response.data.userId);
+                localStorage.setItem("user_id", response.data.userId);
+            }
+            if (response.data.role) {
+                console.log("User Role kaydediliyor:", response.data.role);
+                localStorage.setItem("user_role", response.data.role);
             }
         }
 
@@ -43,6 +45,7 @@ const login = async (username, password) => {
 const logout = () => {
     localStorage.removeItem("user_token");
     localStorage.removeItem("user_id");
+    localStorage.removeItem("user_role");
 };
 
 const getCurrentToken = () => {
@@ -53,10 +56,20 @@ const getCurrentUserId = () => {
     return localStorage.getItem("user_id");
 };
 
+const getCurrentRole = () => {
+    return localStorage.getItem("user_role");
+};
+
+const isAdmin = () => {
+    return localStorage.getItem("user_role") === "ADMIN";
+};
+
 export default {
     register,
     login,
     logout,
     getCurrentToken,
-    getCurrentUserId
+    getCurrentUserId,
+    getCurrentRole,
+    isAdmin
 };

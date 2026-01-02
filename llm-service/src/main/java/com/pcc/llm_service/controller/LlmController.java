@@ -1,11 +1,16 @@
 package com.pcc.llm_service.controller;
 
 import com.pcc.llm_service.model.Topic;
+import com.pcc.llm_service.model.Content;
 import com.pcc.llm_service.service.GeminiService;
 import com.pcc.llm_service.repository.SummaryRepository;
+import com.pcc.llm_service.repository.ContentRepository;
 import com.pcc.llm_service.repository.TopicRepository;
 import com.pcc.llm_service.model.Summary;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,12 +21,15 @@ import java.util.List;
 public class LlmController {
 
     private final GeminiService geminiService;
-    private  final SummaryRepository summaryRepository;
+    private final SummaryRepository summaryRepository;
+    private final ContentRepository contentRepository;
     private final TopicRepository topicRepository;
 
-    public LlmController(GeminiService geminiService, SummaryRepository summaryRepository, TopicRepository topicRepository) {
+    public LlmController(GeminiService geminiService, SummaryRepository summaryRepository, 
+                         ContentRepository contentRepository, TopicRepository topicRepository) {
         this.geminiService = geminiService;
         this.summaryRepository = summaryRepository;
+        this.contentRepository = contentRepository;
         this.topicRepository = topicRepository;
     }
 
@@ -32,10 +40,20 @@ public class LlmController {
         return "Yapay Zeka işleme başladı! Konsolu takip et.";
     }
 
-    // Özetlenmiş Haberleri Listele
+    // Özetlenmiş Haberleri Listele (eski - tüm verileri çeker)
     @GetMapping("/summaries")
     public List<Summary> getAllSummaries() {
         return summaryRepository.findAll();
+    }
+
+    // Özetlenmiş Haberleri Sayfalı Listele (published_date'e göre sıralı)
+    @GetMapping("/summaries/paged")
+    public ResponseEntity<Page<Summary>> getPagedSummaries(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Summary> summaryPage = summaryRepository.findAllByOrderByPublishedDateDesc(pageable);
+        return ResponseEntity.ok(summaryPage);
     }
 
 
@@ -64,6 +82,19 @@ public class LlmController {
         return ResponseEntity.ok(null); // Topic atanmamış
     }
 
+    // ContentId listesine göre summary'leri getir (Kaydedilen içerikler için)
+    @GetMapping("/summaries/by-contents")
+    public ResponseEntity<List<Summary>> getSummariesByContentIds(@RequestParam List<java.util.UUID> contentIds) {
+        if (contentIds == null || contentIds.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        
+        List<Summary> summaries = summaryRepository.findAll().stream()
+                .filter(s -> s.getContent() != null && contentIds.contains(s.getContent().getContentId()))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(summaries);
+    }
+
     // İsteğe Bağlı Arama İçin: ID listesi verilen içerikleri özetle (yoksa) ve getir
     @PostMapping("/summarize-batch")
     public ResponseEntity<List<Summary>> summarizeBatch(@RequestBody List<java.util.UUID> contentIds) {
@@ -85,5 +116,39 @@ public class LlmController {
                 .filter(s -> s.getContent() != null && contentIds.contains(s.getContent().getContentId()))
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(summaries);
+    }
+
+    // Admin: İçeriği ve Summary'yi Sil
+    @DeleteMapping("/content/{contentId}")
+    @Transactional
+    public ResponseEntity<String> deleteContent(@PathVariable java.util.UUID contentId) {
+        try {
+            System.out.println("🗑️ LLM Service: İçerik siliniyor -> " + contentId);
+            
+            // 1. Önce bu içeriğe ait summary'yi sil
+            Summary summary = summaryRepository.findByContentId(contentId);
+            if (summary != null) {
+                summaryRepository.delete(summary);
+                System.out.println("   ✓ Summary silindi");
+            }
+            
+            // 2. Sonra content'i sil
+            Content content = contentRepository.findById(contentId).orElse(null);
+            if (content != null) {
+                contentRepository.delete(content);
+                System.out.println("   ✓ Content silindi");
+            }
+            
+            return ResponseEntity.ok("İçerik başarıyla silindi.");
+        } catch (Exception e) {
+            System.err.println("❌ Silme hatası: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Silme hatası: " + e.getMessage());
+        }
+    }
+
+    // Admin: Toplam özet (summary) sayısını getir
+    @GetMapping("/stats/summary-count")
+    public ResponseEntity<Long> getSummaryCount() {
+        return ResponseEntity.ok(summaryRepository.count());
     }
 }
