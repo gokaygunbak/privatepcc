@@ -15,18 +15,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
-// @RequiredArgsConstructor // Constructor Injection (Autowired yerine geçer,
-// daha temizdir)
+// @RequiredArgsConstructor
 public class UserPreferenceService {
 
     private final UserTopicPreferenceRepository preferenceRepository;
     private final UserTopicScoreRepository scoreRepository;
     private final UserInteractionRepository interactionRepository;
-    private final LlmServiceClient llmServiceClient; // Feign Client (Telefon Hattı)
+    private final LlmServiceClient llmServiceClient; // Feign Client
 
     public UserPreferenceService(UserTopicPreferenceRepository preferenceRepository,
             UserTopicScoreRepository scoreRepository,
@@ -38,44 +40,110 @@ public class UserPreferenceService {
         this.llmServiceClient = llmServiceClient;
     }
 
-    // 1. Kullanıcının ilgi alanlarını kaydet (Onboarding)
+    // Kullanıcının ilgi alanlarını kaydet (Onboarding)
     @Transactional
-    public void saveUserPreferences(Long userId, List<Integer> topicIds) {
-        // A. Eskileri temizle (Onboarding tekrar yapılırsa)
-        List<UserTopicPreference> existing = preferenceRepository.findByUserId(userId);
-        preferenceRepository.deleteAll(existing);
+    public void saveUserPreferences(Long userId, List<Integer> newTopicIds) {
+        // 1. Mevcut seçili topic'leri al
+        List<Integer> oldTopicIds = preferenceRepository.findTopicIdsByUserId(userId);
+        
+        // Debug: Mevcut skorları da kontrol et
+        List<UserTopicScore> existingScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
+        System.out.println("🔍 DEBUG - Mevcut skorlar: " + existingScores.stream()
+            .map(s -> "Topic=" + s.getTopicId() + ",Skor=" + s.getScore())
+            .collect(java.util.stream.Collectors.joining(", ")));
+        
+        Set<Integer> oldSet = new HashSet<>(oldTopicIds);
+        Set<Integer> newSet = new HashSet<>(newTopicIds);
 
-        // B. Yeni seçimleri ve Başlangıç Skorlarını kaydet
-        for (Integer topicId : topicIds) {
-            // Tercihi kaydet
+        // 2. Kaldırılan topic'leri bul (eski - yeni)
+        Set<Integer> removedTopics = new HashSet<>(oldSet);
+        removedTopics.removeAll(newSet);
+
+        // 3. Yeni eklenen topic'leri bul (yeni - eski)
+        Set<Integer> addedTopics = new HashSet<>(newSet);
+        addedTopics.removeAll(oldSet);
+
+        // 4. Korunan topic'leri bul (kesişim) - bunlara dokunmayacağız
+        Set<Integer> keptTopics = new HashSet<>(oldSet);
+        keptTopics.retainAll(newSet);
+
+        System.out.println("📊 Tercih Değişikliği - User=" + userId);
+        System.out.println("   Eski: " + oldTopicIds);
+        System.out.println("   Yeni: " + newTopicIds);
+        System.out.println("   ➕ Eklenen: " + addedTopics);
+        System.out.println("   ➖ Kaldırılan: " + removedTopics);
+        System.out.println("   ✓ Korunan: " + keptTopics);
+
+        // 5. Tercihleri güncelle (hepsini sil, yeniden ekle)
+        preferenceRepository.deleteAllByUserId(userId);
+        preferenceRepository.flush();
+
+        for (Integer topicId : newTopicIds) {
             UserTopicPreference pref = new UserTopicPreference();
             pref.setUserId(userId);
             pref.setTopicId(topicId);
             preferenceRepository.save(pref);
-
-            // Başlangıç Skorunu Ata (Örn: 5.0 ile başlasın)
-            updateUserTopicScore(userId, topicId, 5.0);
         }
+
+        // 6. Kaldırılan topic'lerin skorlarını sil
+        for (Integer topicId : removedTopics) {
+            UserTopicScoreId scoreId = new UserTopicScoreId(userId, topicId);
+            scoreRepository.deleteById(scoreId);
+            System.out.println("🗑️ Skor silindi: Topic=" + topicId);
+        }
+
+        // 7. Yeni eklenen topic'lere başlangıç puanı ver (SADECE skor yoksa!)
+        for (Integer topicId : addedTopics) {
+            UserTopicScoreId scoreId = new UserTopicScoreId(userId, topicId);
+            
+            // Eğer bu topic için zaten skor varsa, DOKUNMA!
+            if (scoreRepository.existsById(scoreId)) {
+                System.out.println("⏭️ Topic=" + topicId + " için skor zaten var, atlanıyor.");
+                continue;
+            }
+            
+            UserTopicScore newScore = new UserTopicScore(userId, topicId, 5.0);
+            scoreRepository.save(newScore);
+            System.out.println("✨ Yeni skor oluşturuldu: Topic=" + topicId + ", Skor=5.0");
+        }
+
+        // 8. Korunan topic'lerin skorlarına DOKUNMA (mevcut skorları koru)
+        System.out.println("✅ İşlem tamamlandı. Korunan topic'lerin skorları değişmedi.");
     }
 
-    // 2. Etkileşimi Kaydet ve Puanla
+    // Etkileşimi Kaydet ve Puanla
     @Transactional
     public void recordInteraction(InteractionRequest request) {
-        // A. Etkileşimi Veritabanına Yaz (Loglama)
+        // Etkileşimi Veritabanına Yaz (Loglama)
         UserInteraction interaction = new UserInteraction();
         interaction.setUserId(request.getUserId());
         interaction.setContentId(request.getContentId());
         interaction.setInteractionType(request.getInteractionType());
         interactionRepository.save(interaction);
 
-        // B. Konu Puanını Güncelle (Eğer konu bilgisi varsa)
-        if (request.getTopicId() != null) {
+        // Topic ID'yi belirle: Önce request'ten, yoksa LLM Service'den çek
+        Integer topicId = request.getTopicId();
+        
+        if (topicId == null && request.getContentId() != null) {
+            try {
+                // ContentId'den Summary'nin topic_id'sini çek
+                topicId = llmServiceClient.getTopicIdByContentId(request.getContentId());
+                System.out.println("🎯 Topic ID LLM Service'den alındı: " + topicId + " (ContentId: " + request.getContentId() + ")");
+            } catch (Exception e) {
+                System.err.println("⚠️ Topic ID alınamadı: " + e.getMessage());
+            }
+        }
+
+        // Konu Puanını Güncelle (Eğer konu bilgisi varsa)
+        if (topicId != null) {
             double scoreIncrement = getScoreByInteractionType(request.getInteractionType());
-            updateUserTopicScore(request.getUserId(), request.getTopicId(), scoreIncrement);
+            updateUserTopicScore(request.getUserId(), topicId, scoreIncrement);
+        } else {
+            System.out.println("⚠️ Topic ID bulunamadı, puanlama yapılmadı.");
         }
     }
 
-    // Yardımcı Metod: Puan Güncelleme
+    // Puan Güncelleme
     private void updateUserTopicScore(Long userId, Integer topicId, double scoreDelta) {
         UserTopicScoreId id = new UserTopicScoreId();
         id.setUserId(userId);
@@ -103,7 +171,7 @@ public class UserPreferenceService {
         scoreEntity.setLastUpdated(LocalDateTime.now());
         scoreRepository.save(scoreEntity);
         System.out.println("SKOR GÜNCELLENDİ: User=" + userId + ", Topic=" + topicId + ", Eski=" + currentScore
-                + ", Yeni=" + newScore + " 📈");
+                + ", Yeni=" + newScore);
     }
 
     // Hangi interaction kaç puan
@@ -118,19 +186,35 @@ public class UserPreferenceService {
         };
     }
 
-    // 3. Kişiselleştirilmiş Akışı Getir
+    // Kişiselleştirilmiş Akışı Getir
     public List<SummaryDto> getPersonalizedFeed(Long userId) {
-        // A. Kullanıcının sevdiği konuların ID'lerini çek
-        // TODO: Burayı artık "En yüksek puanlı konular" olarak değiştirebiliriz.
-        // Şimdilik eski mantık (seçilenler) kalsın veya ikisini birleştirebiliriz.
+        //  Kullanıcının sevdiği konuların ID'lerini çek
         List<Integer> topicIds = preferenceRepository.findTopicIdsByUserId(userId);
 
-        // B. Eğer hiç tercihi yoksa boş liste veya genel akış dönülebilir
+        // Eğer hiç tercihi yoksa boş liste
         if (topicIds.isEmpty()) {
             return List.of();
         }
 
-        // C. LLM Servisini ara ve bu ID'lere ait haberleri iste!
+        // LLM Servisini ara ve bu ID'lere ait haberleri iste
         return llmServiceClient.getSummariesByTopics(topicIds);
+    }
+
+    // Kullanıcının Seçtiği İlgi Alanlarını Getir (Profil sayfası için)
+    public List<com.pcc.interaction_service.dto.TopicDto> getUserSelectedTopics(Long userId) {
+        // 1. Kullanıcının seçtiği topic ID'lerini al
+        List<Integer> userTopicIds = preferenceRepository.findTopicIdsByUserId(userId);
+        
+        if (userTopicIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. Tüm konuları LLM Service'den al
+        List<com.pcc.interaction_service.dto.TopicDto> allTopics = llmServiceClient.getAllTopics();
+
+        // 3. Sadece kullanıcının seçtiklerini filtrele
+        return allTopics.stream()
+                .filter(topic -> userTopicIds.contains(topic.getTopicId()))
+                .collect(java.util.stream.Collectors.toList());
     }
 }

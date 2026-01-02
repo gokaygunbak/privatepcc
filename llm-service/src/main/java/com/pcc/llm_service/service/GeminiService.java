@@ -4,9 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pcc.llm_service.model.Content;
 import com.pcc.llm_service.model.Summary;
+import com.pcc.llm_service.model.Topic;
 import com.pcc.llm_service.repository.ContentRepository;
 import com.pcc.llm_service.repository.SummaryRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.pcc.llm_service.repository.TopicRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -15,15 +16,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class GeminiService {
 
-
     private final ContentRepository contentRepository;
-
-
     private final SummaryRepository summaryRepository;
+    private final TopicRepository topicRepository;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -34,9 +34,20 @@ public class GeminiService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper(); // JSON işlemek için
 
-    public GeminiService(ContentRepository contentRepository, SummaryRepository summaryRepository) {
+    public GeminiService(ContentRepository contentRepository, SummaryRepository summaryRepository, TopicRepository topicRepository) {
         this.contentRepository = contentRepository;
         this.summaryRepository = summaryRepository;
+        this.topicRepository = topicRepository;
+    }
+
+    /**
+     * Topic listesini veritabanından çekip prompt için formatlı string döndürür
+     */
+    private String getTopicListForPrompt() {
+        List<Topic> topics = topicRepository.findAll();
+        return topics.stream()
+                .map(t -> t.getTopicId() + ". " + t.getName())
+                .collect(Collectors.joining(", "));
     }
 
     // Tetikleyici Fonksiyon
@@ -48,8 +59,7 @@ public class GeminiService {
         for (Content content : pendingContents) {
             try {
                 processSingleContent(content);
-                // --- BURAYA DİKKAT: HIZ SINIRI FRENİ ---
-                System.out.println("Google kızmasın diye 12 saniye bekliyorum... ☕");
+                System.out.println("12 saniye delay");
                 Thread.sleep(12000);
             } catch (Exception e) {
                 System.err.println("Hata (" + content.getContentId() + "): " + e.getMessage());
@@ -62,11 +72,16 @@ public class GeminiService {
     }
 
     private void processSingleContent(Content content) {
+        // Topic listesini veritabanından çek
+        String topicList = getTopicListForPrompt();
+        
         // 2. Gemini için özel Prompt hazırla
         String prompt = "Aşağıdaki metni analiz et ve Türkçe olarak özetle. " +
+                "Ayrıca bu haberin hangi konuya ait olduğunu belirle. " +
+                "Sadece şu konulardan BİRİNİ seç: [" + topicList + "]. " +
                 "Cevabı SADECE şu JSON formatında ver, başka hiçbir şey yazma: " +
-                "{ \"title\": \"İlgi çekici bir başlık\", \"summary\": \"Kısa özet\", \"tags\": \"teknoloji, yapay zeka\" } "
-                +
+                "{ \"title\": \"İlgi çekici bir başlık\", \"summary\": \"Kısa özet\", \"tags\": \"teknoloji, yapay zeka\", \"topic_id\": 8 } " +
+                "(topic_id alanına seçtiğin konunun numarasını yaz)" +
                 "\n\nİşte metin:\n" + content.getOriginalText();
 
         // 3. API İsteğini Hazırla (Gemini'nin istediği JSON yapısı)
@@ -102,7 +117,7 @@ public class GeminiService {
             JsonNode myJson = objectMapper.readTree(aiText);
 
             Summary summary = new Summary();
-            // İlişkiyi kuruyoruz (Hangi haberin özeti?)
+            // Hangi haberin özeti?
             summary.setContent(content);
 
             // AI'dan gelen verileri bas
@@ -117,6 +132,16 @@ public class GeminiService {
                 summary.setCreatedAt(java.time.LocalDateTime.now());
             }
             // --------------------------------
+
+            // Topic ID'yi parse et ve summary'e ata
+            JsonNode topicIdNode = myJson.get("topic_id");
+            if (topicIdNode != null && !topicIdNode.isNull()) {
+                int topicId = topicIdNode.asInt();
+                topicRepository.findById(topicId).ifPresent(topic -> {
+                    summary.setTopic(topic);
+                    System.out.println("Topic atandı: " + topicId + " - " + topic.getName());
+                });
+            }
 
             summaryRepository.save(summary);
 

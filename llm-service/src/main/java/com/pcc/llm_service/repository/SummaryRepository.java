@@ -18,4 +18,8 @@ public interface SummaryRepository extends JpaRepository<Summary, UUID> {
             "WHERE src.topic.topicId IN :topicIds " +
             "ORDER BY s.createdAt DESC")
     List<Summary> findByTopicIdIn(@Param("topicIds") List<Integer> topicIds);
+
+    // ContentId'den Summary'yi bul (Topic bilgisi için)
+    @Query("SELECT s FROM Summary s WHERE s.content.contentId = :contentId")
+    Summary findByContentId(@Param("contentId") UUID contentId);
 }

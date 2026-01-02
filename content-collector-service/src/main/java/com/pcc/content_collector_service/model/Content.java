@@ -15,12 +15,14 @@ public class Content {
 
     private Integer sourceId;
 
-    private String originalTitle;
+    @Column(length = 500)
+    private String originalTitle; // Başlıklar uzun olabilir
 
     @Column(columnDefinition = "TEXT")
     private String originalText; // Haber metni uzun olabilir
 
-    private String originalUrl;
+    @Column(length = 2000)
+    private String originalUrl; // Google News URL'leri çok uzun olabiliyor
 
     private LocalDateTime publishedDate;
 

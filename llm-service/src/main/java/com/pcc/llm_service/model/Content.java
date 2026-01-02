@@ -62,8 +62,8 @@ public class Content {
         this.publishedDate = publishedDate;
     }
 
-    @jakarta.persistence.Column(name = "original_url", length = 500)
-    private String url;
+    @jakarta.persistence.Column(name = "original_url", length = 2000)
+    private String url; // Google News URL'leri çok uzun olabiliyor
 
     public String getUrl() {
         return url;

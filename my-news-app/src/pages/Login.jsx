@@ -46,7 +46,7 @@ const Login = () => {
                     }}
                 >
                     <Typography variant="h4" component="h1" gutterBottom fontWeight="bold" sx={{ color: '#0388a6' }}>
-                        Hoş Geldin 👋
+                        Hoş Geldin 
                     </Typography>
                     <Typography variant="body1" sx={{ color: '#14231d', mb: 3 }}>
                         Haberlere erişmek için giriş yapmalısın.

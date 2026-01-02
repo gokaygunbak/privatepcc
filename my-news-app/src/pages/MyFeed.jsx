@@ -96,7 +96,7 @@ function MyFeed() {
         <MainLayout title="Size Özel Bülten">
             <Container maxWidth="xl">
                 <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
-                    🎉 Size Özel Bülten
+                    Size Özel Bülten
                 </Typography>
 
                 {error && summaries.length === 0 && (

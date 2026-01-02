@@ -11,12 +11,13 @@ import java.util.List;
 @Repository
 public interface UserTopicScoreRepository extends JpaRepository<UserTopicScore, UserTopicScoreId> {
 
-    // Kullanıcının en çok puan topladığı konuları (Skora göre azalan) getir
-    // Pageable ile sınırlandırabiliriz ama şimdilik listeleyelim
+    // Pageable ile sınırlandırabilirim ama şimdilik listeleyelim
     List<UserTopicScore> findByUserIdOrderByScoreDesc(Long userId);
 
-    // Belli bir eşiğin üstündeki konuları getir (Örn: Skoru 5'ten büyük olanlar
-    // favoridir)
+    // Belli bir eşiğin üstündeki konuları getir Skoru 5'ten büyük olanlar vs
     @Query("SELECT u.topicId FROM UserTopicScore u WHERE u.userId = :userId AND u.score > :threshold")
     List<Integer> findTopTopicIds(Long userId, Double threshold);
+
+    // Kullanıcının tüm skorlarını sil (Onboarding tekrarında)
+    void deleteAllByUserId(Long userId);
 }

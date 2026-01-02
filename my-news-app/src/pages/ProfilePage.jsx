@@ -12,9 +12,18 @@ import {
     Grid,
     Alert,
     Snackbar,
-    IconButton
+    IconButton,
+    Chip,
+    Divider,
+    CircularProgress
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Save as SaveIcon, AccountCircle as AccountCircleIcon } from '@mui/icons-material';
+import { 
+    ArrowBack as ArrowBackIcon, 
+    Save as SaveIcon, 
+    AccountCircle as AccountCircleIcon,
+    Category as CategoryIcon,
+    Edit as EditIcon
+} from '@mui/icons-material';
 import AuthService from '../services/AuthService';
 import MainLayout from '../components/MainLayout';
 
@@ -30,6 +39,8 @@ const ProfilePage = () => {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [userTopics, setUserTopics] = useState([]);
+    const [topicsLoading, setTopicsLoading] = useState(true);
 
     useEffect(() => {
         const userId = AuthService.getCurrentUserId();
@@ -41,6 +52,7 @@ const ProfilePage = () => {
         }
 
         fetchProfile(userId, token);
+        fetchUserTopics(userId, token);
     }, []);
 
     const fetchProfile = async (userId, token) => {
@@ -55,6 +67,24 @@ const ProfilePage = () => {
             console.error("Profil yüklenirken hata:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchUserTopics = async (userId, token) => {
+        console.log("Fetching topics for userId:", userId);
+        try {
+            const response = await axios.get(`http://localhost:8080/api/interactions/preferences/${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log("Topics API Response:", response.data);
+            if (response.data) {
+                setUserTopics(response.data);
+            }
+        } catch (error) {
+            console.error("İlgi alanları yüklenirken hata:", error);
+            console.error("Hata detayı:", error.response?.data || error.message);
+        } finally {
+            setTopicsLoading(false);
         }
     };
 
@@ -209,6 +239,67 @@ const ProfilePage = () => {
                             </Grid>
                         </Grid>
                     )}
+
+                    {/* İLGİ ALANLARI BÖLÜMÜ */}
+                    <Divider sx={{ my: 4 }} />
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <CategoryIcon color="primary" />
+                                <Typography variant="h6" color="primary">
+                                    Seçtiğim İlgi Alanlarım
+                                </Typography>
+                            </Box>
+                            <Button 
+                                size="small" 
+                                startIcon={<EditIcon />}
+                                onClick={() => navigate('/onboarding')}
+                                variant="outlined"
+                            >
+                                Düzenle
+                            </Button>
+                        </Box>
+
+                        {topicsLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                <CircularProgress size={30} />
+                            </Box>
+                        ) : userTopics.length > 0 ? (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {userTopics.map((topic) => (
+                                    <Chip
+                                        key={topic.topicId}
+                                        label={topic.name}
+                                        color="primary"
+                                        variant="outlined"
+                                        sx={{ 
+                                            fontSize: '0.95rem', 
+                                            py: 2,
+                                            borderRadius: 2,
+                                            '&:hover': {
+                                                bgcolor: 'primary.main',
+                                                color: 'white'
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box sx={{ textAlign: 'center', py: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+                                <Typography color="text.secondary" gutterBottom>
+                                    Henüz ilgi alanı seçmediniz.
+                                </Typography>
+                                <Button 
+                                    variant="contained" 
+                                    size="small"
+                                    onClick={() => navigate('/onboarding')}
+                                    sx={{ mt: 1 }}
+                                >
+                                    İlgi Alanlarını Seç
+                                </Button>
+                            </Box>
+                        )}
+                    </Box>
                 </Paper>
             </Container>
 

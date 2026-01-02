@@ -10,12 +10,10 @@ public class InteractionRequest {
     private Long userId;
     private UUID contentId;
     private UserInteraction.InteractionType interactionType;
-    private Integer topicId; // Optional: If provided, we update the topic score
-    // Constructor (Boş)
+    private Integer topicId;
     public InteractionRequest() {
     }
 
-    // Constructor (Dolu - İstersen kullanırsın)
     public InteractionRequest(Long userId, UUID contentId, UserInteraction.InteractionType interactionType, Integer topicId) {
         this.userId = userId;
         this.contentId = contentId;
@@ -23,7 +21,6 @@ public class InteractionRequest {
         this.topicId = topicId;
     }
 
-    // --- Getters and Setters ---
 
     public Long getUserId() {
         return userId;

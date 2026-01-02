@@ -24,6 +24,10 @@ public class Summary {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @ManyToOne
+    @JoinColumn(name = "topic_id")
+    private Topic topic; // AI tarafından belirlenen konu
+
     public UUID getSummaryId() {
         return summaryId;
     }
@@ -72,10 +76,26 @@ public class Summary {
         this.createdAt = createdAt;
     }
 
-    // JSON'a "topicId" alanını eklemek için sanal getter
+    public Topic getTopic() {
+        return topic;
+    }
+
+    public void setTopic(Topic topic) {
+        this.topic = topic;
+    }
+
+    // JSON'a "topicId" alanını eklemek için getter (AI'ın belirlediği topic)
     public Integer getTopicId() {
-        if (content != null && content.getSource() != null && content.getSource().getTopic() != null) {
-            return content.getSource().getTopic().getTopicId();
+        if (topic != null) {
+            return topic.getTopicId();
+        }
+        return null;
+    }
+
+    // JSON'a "topicName" alanını eklemek için getter
+    public String getTopicName() {
+        if (topic != null) {
+            return topic.getName();
         }
         return null;
     }

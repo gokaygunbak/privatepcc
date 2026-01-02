@@ -14,14 +14,11 @@ public class Topic {
 
     private String name;
 
-    private String keywords;
-
     public Topic() {
     }
 
-    public Topic(String name, String keywords) {
+    public Topic(String name) {
         this.name = name;
-        this.keywords = keywords;
     }
 
     public Integer getTopicId() {
@@ -38,13 +35,5 @@ public class Topic {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getKeywords() {
-        return keywords;
-    }
-
-    public void setKeywords(String keywords) {
-        this.keywords = keywords;
     }
 }

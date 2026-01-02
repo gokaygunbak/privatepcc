@@ -25,22 +25,21 @@ public class LlmController {
         this.topicRepository = topicRepository;
     }
 
-    // 1. Haberleri Özetle (Tetikleyici)
+
     @GetMapping("/start-processing")
     public String startProcessing() {
         new Thread(() -> geminiService.processAllPendingContents()).start();
         return "Yapay Zeka işleme başladı! Konsolu takip et.";
     }
 
-    // 2. Özetlenmiş Haberleri Listele (React Buraya İstek Atıyor)
+    // Özetlenmiş Haberleri Listele
     @GetMapping("/summaries")
     public List<Summary> getAllSummaries() {
         return summaryRepository.findAll();
     }
 
-    // LlmController.java'nın içine eklenecekler:
 
-    // 1. Frontend'de kullanıcıya "Hangi konuları seversin?" diye sormak için
+    // Frontend'de kullanıcıya "Hangi konuları seversin?" diye sormak için
     // konuları listele
     @GetMapping("/topics")
     public ResponseEntity<List<Topic>> getAllTopics() {
@@ -48,19 +47,27 @@ public class LlmController {
         return ResponseEntity.ok(topicRepository.findAll());
     }
 
-    // 2. Interaction Service'in arayıp "Bana şu konulardaki haberleri ver" dediği
-    // yer
+    // Interaction Service in konuya göre haberleri istediği yer
     @GetMapping("/summaries/by-topics")
     public ResponseEntity<List<Summary>> getSummariesByTopics(@RequestParam List<Integer> topicIds) {
         // Repository'e yeni eklediğimiz sorguyu çağırıyoruz
         return ResponseEntity.ok(summaryRepository.findByTopicIdIn(topicIds));
     }
 
-    // 3. İsteğe Bağlı Arama İçin: ID listesi verilen içerikleri özetle (yoksa) ve
-    // getir
+    // ContentId'den Topic ID'yi getir (Interaction Service için)
+    @GetMapping("/summaries/topic-by-content/{contentId}")
+    public ResponseEntity<Integer> getTopicIdByContentId(@PathVariable java.util.UUID contentId) {
+        Summary summary = summaryRepository.findByContentId(contentId);
+        if (summary != null && summary.getTopic() != null) {
+            return ResponseEntity.ok(summary.getTopic().getTopicId());
+        }
+        return ResponseEntity.ok(null); // Topic atanmamış
+    }
+
+    // İsteğe Bağlı Arama İçin: ID listesi verilen içerikleri özetle (yoksa) ve getir
     @PostMapping("/summarize-batch")
     public ResponseEntity<List<Summary>> summarizeBatch(@RequestBody List<java.util.UUID> contentIds) {
-        // 1. Önce bu içeriklerin özetleri zaten var mı kontrol et, olmayanları oluştur
+        // Önce bu içeriklerin özetleri zaten var mı kontrol et, olmayanları oluştur
         contentIds.forEach(id -> {
             // "existsByContentId" -> "existsByContent_ContentId"
             if (!summaryRepository.existsByContent_ContentId(id)) {
@@ -72,7 +79,7 @@ public class LlmController {
             }
         });
 
-        // 2. Şimdi özetleri getir
+        // Şimdi özetleri getir
         List<Summary> summaries = summaryRepository.findAll().stream()
                 // "s.getContentId()" -> "s.getContent().getContentId()"
                 .filter(s -> s.getContent() != null && contentIds.contains(s.getContent().getContentId()))

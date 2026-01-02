@@ -36,16 +36,37 @@ function Onboarding() {
             navigate("/");
             return;
         }
-        fetchTopics();
+        fetchTopicsAndPreferences();
     }, []);
 
-    const fetchTopics = async () => {
+    const fetchTopicsAndPreferences = async () => {
+        const token = AuthService.getCurrentToken();
+        const userId = AuthService.getCurrentUserId();
+        
         try {
-            // Gateway üzerinden konuları çek
-            const response = await axios.get('http://localhost:8080/api/interactions/topics', {
-                headers: { Authorization: `Bearer ${AuthService.getCurrentToken()}` }
+            // 1. Tüm konuları çek
+            const topicsResponse = await axios.get('http://localhost:8080/api/interactions/topics', {
+                headers: { Authorization: `Bearer ${token}` }
             });
-            setTopics(response.data);
+            setTopics(topicsResponse.data);
+
+            // 2. Kullanıcının mevcut tercihlerini çek
+            if (userId) {
+                try {
+                    const prefsResponse = await axios.get(`http://localhost:8080/api/interactions/preferences/${userId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    // Mevcut tercihleri seçili olarak işaretle
+                    if (prefsResponse.data && prefsResponse.data.length > 0) {
+                        const existingTopicIds = prefsResponse.data.map(topic => topic.topicId);
+                        setSelectedTopicIds(existingTopicIds);
+                        console.log("Mevcut tercihler yüklendi:", existingTopicIds);
+                    }
+                } catch (prefErr) {
+                    console.log("Mevcut tercih bulunamadı (ilk kez seçim yapılacak)");
+                }
+            }
+
             setLoading(false);
         } catch (err) {
             console.error("Konular çekilemedi:", err);
@@ -76,9 +97,12 @@ function Onboarding() {
             return;
         }
 
+        // Hiç seçim yoksa kullanıcıya onay sor
         if (selectedTopicIds.length === 0) {
-            setError("Lütfen en az bir ilgi alanı seçin.");
-            return;
+            const confirmed = window.confirm(
+                "Hiç ilgi alanı seçmediniz. Tüm tercihleriniz ve skorlarınız sıfırlanacak. Devam etmek istiyor musunuz?"
+            );
+            if (!confirmed) return;
         }
 
         setSaving(true);
@@ -132,7 +156,10 @@ function Onboarding() {
                             İlgi Alanlarını Seç
                         </Typography>
                         <Typography variant="h6" color="text.secondary">
-                            Sana en uygun haberleri getirebilmemiz için neleri sevdiğini söyle.
+                            {selectedTopicIds.length > 0 
+                                ? `${selectedTopicIds.length} alan seçili. Ekle veya çıkar.`
+                                : "Sana en uygun haberleri getirebilmemiz için neleri sevdiğini söyle."
+                            }
                         </Typography>
                     </Box>
 
@@ -224,16 +251,18 @@ function Onboarding() {
                                     size="large"
                                     endIcon={saving ? <CircularProgress size={20} color="inherit" /> : <ArrowForwardIcon />}
                                     onClick={handleSave}
-                                    disabled={saving || selectedTopicIds.length === 0}
+                                    disabled={saving}
                                     sx={{
                                         borderRadius: 3,
                                         px: 4,
                                         py: 1.5,
                                         fontWeight: 'bold',
-                                        background: 'linear-gradient(45deg, #673AB7 30%, #512DA8 90%)',
+                                        background: selectedTopicIds.length === 0 
+                                            ? 'linear-gradient(45deg, #757575 30%, #616161 90%)'
+                                            : 'linear-gradient(45deg, #673AB7 30%, #512DA8 90%)',
                                     }}
                                 >
-                                    {saving ? "Kaydediliyor..." : "Devam Et"}
+                                    {saving ? "Kaydediliyor..." : selectedTopicIds.length === 0 ? "Tümünü Kaldır" : "Devam Et"}
                                 </Button>
                             </Box>
                         </>

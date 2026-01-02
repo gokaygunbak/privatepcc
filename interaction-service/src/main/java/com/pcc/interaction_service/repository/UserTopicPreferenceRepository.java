@@ -2,6 +2,7 @@ package com.pcc.interaction_service.repository;
 
 import com.pcc.interaction_service.entity.UserTopicPreference;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -19,4 +20,9 @@ public interface UserTopicPreferenceRepository extends JpaRepository<UserTopicPr
 
     // Kullanıcı bu konuyu zaten takip ediyor mu? (Çift kayıt olmasın diye)
     boolean existsByUserIdAndTopicId(Long userId, Integer topicId);
+
+    // Kullanıcının tüm tercihlerini sil (Onboarding tekrar yapılırsa)
+    @Modifying
+    @Query("DELETE FROM UserTopicPreference u WHERE u.userId = :userId")
+    void deleteAllByUserId(Long userId);
 }

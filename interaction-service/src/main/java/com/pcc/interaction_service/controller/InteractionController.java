@@ -25,7 +25,7 @@ public class InteractionController {
         this.llmServiceClient = llmServiceClient;
     }
 
-    // 1. Tüm Konuları Listele (Kullanıcı seçim yapsın diye)
+    // Tüm Konuları Listele (Kullanıcı seçim yapsın diye)
     // Bunu direkt LLM servinden de isteyebiliriz ama buradan geçirmek daha temiz
     // (Gateway tek kapı).
     @GetMapping("/topics")
@@ -33,7 +33,7 @@ public class InteractionController {
         return ResponseEntity.ok(llmServiceClient.getAllTopics());
     }
 
-    // 2. Kullanıcının İlgi Alanlarını Kaydet (Onboarding)
+    // Kullanıcının İlgi Alanlarını Kaydet (Onboarding)
     @PostMapping("/preferences")
     public ResponseEntity<String> savePreferences(@RequestBody PreferenceRequest request) {
         System.out.println("Gelen Tercih İsteği: UserID=" + request.getUserId() + ", Topics=" + request.getTopicIds());
@@ -46,7 +46,7 @@ public class InteractionController {
         }
     }
 
-    // 3. Etkileşim Kaydet (Like/View/Save) - YENİ
+    // Etkileşim Kaydet (Like/View/Save)
     @PostMapping("/interact")
     public ResponseEntity<String> recordInteraction(@RequestBody InteractionRequest request) {
         System.out.println("GELEN INTERACTION: User=" + request.getUserId() + ", Type=" + request.getInteractionType()
@@ -55,10 +55,17 @@ public class InteractionController {
         return ResponseEntity.ok("Etkileşim kaydedildi.");
     }
 
-    // 4. Kişiselleştirilmiş Akışı Getir
+    // Kişiselleştirilmiş Akışı Getir
     @GetMapping("/feed")
     public ResponseEntity<List<SummaryDto>> getPersonalizedFeed(@RequestParam Long userId) {
         return ResponseEntity.ok(preferenceService.getPersonalizedFeed(userId));
+    }
+
+    // Kullanıcının Seçtiği İlgi Alanlarını Getir (Profil sayfası için)
+    @GetMapping("/preferences/{userId}")
+    public ResponseEntity<List<TopicDto>> getUserPreferences(@PathVariable Long userId) {
+        List<TopicDto> userTopics = preferenceService.getUserSelectedTopics(userId);
+        return ResponseEntity.ok(userTopics);
     }
 
 }
