@@ -60,7 +60,7 @@ function SavedContentsPage() {
 
     const handleInteraction = async (contentId, type, topicId) => {
         console.log(`[Interaction] ContentID=${contentId}, Type=${type}, TopicID=${topicId}`);
-        
+
         if (type === 'LIKE') {
             setLikedPosts(prev => ({ ...prev, [contentId]: !prev[contentId] }));
         } else if (type === 'REPORT') {
@@ -82,7 +82,7 @@ function SavedContentsPage() {
                 headers: { Authorization: `Bearer ${AuthService.getCurrentToken()}` }
             });
             console.log("[Interaction] Success!");
-            
+
             if (type === 'REPORT') {
                 alert("Şikayetiniz admin'e iletildi. Teşekkürler!");
             }
@@ -91,10 +91,28 @@ function SavedContentsPage() {
         }
     };
 
-    const handleRemoveFromSaved = async (contentId) => {
-        // UI'dan kaldır
-        setSavedContents(prev => prev.filter(item => item.contentId !== contentId));
-        // TODO: Backend'e silme isteği gönder (opsiyonel)
+    const handleUnsave = async (contentId, topicId) => {
+        // 1. UI'dan hemen kaldır (Optimistic)
+        // contentId ile eşleşen (SummaryDto içindeki content.contentId) öğeyi filtrele
+        setSavedContents(prev => prev.filter(item => {
+            const currentItemContentId = item.content?.contentId;
+            return currentItemContentId !== contentId;
+        }));
+
+        // 2. Backend'e isteği gönder (Toggle mantığı - Unsave yapacak)
+        try {
+            await axios.post('http://localhost:8080/api/interactions/interact', {
+                userId: AuthService.getCurrentUserId(),
+                contentId: contentId,
+                interactionType: 'SAVE',
+                topicId: topicId
+            }, {
+                headers: { Authorization: `Bearer ${AuthService.getCurrentToken()}` }
+            });
+            console.log("[Unsave] Success for ID:", contentId);
+        } catch (error) {
+            console.error("Unsave failed:", error);
+        }
     };
 
     return (
@@ -122,8 +140,8 @@ function SavedContentsPage() {
                         ))}
                     </Grid>
                 ) : savedContents.length === 0 ? (
-                    <Box sx={{ 
-                        textAlign: 'center', 
+                    <Box sx={{
+                        textAlign: 'center',
                         py: 8,
                         bgcolor: 'rgba(255,255,255,0.03)',
                         borderRadius: 4
@@ -135,9 +153,9 @@ function SavedContentsPage() {
                         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
                             Haberleri kaydetmek için yer imi simgesine tıklayın
                         </Typography>
-                        <Button 
-                            variant="contained" 
-                            color="primary" 
+                        <Button
+                            variant="contained"
+                            color="primary"
                             onClick={() => navigate("/my-feed")}
                         >
                             Haberlere Göz At
@@ -147,10 +165,10 @@ function SavedContentsPage() {
                     <Grid container spacing={3}>
                         {savedContents.map((news) => (
                             <Grid item xs={12} key={news.summaryId || news.contentId}>
-                                <Card sx={{ 
-                                    width: '100%', 
-                                    display: 'flex', 
-                                    flexDirection: { xs: 'column', sm: 'row' }, 
+                                <Card sx={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    flexDirection: { xs: 'column', sm: 'row' },
                                     p: 2,
                                     transition: 'transform 0.2s, box-shadow 0.2s',
                                     '&:hover': {
@@ -177,10 +195,10 @@ function SavedContentsPage() {
                                         </Typography>
                                         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                                             {news.topicName && (
-                                                <Chip 
-                                                    label={news.topicName} 
-                                                    size="small" 
-                                                    color="secondary" 
+                                                <Chip
+                                                    label={news.topicName}
+                                                    size="small"
+                                                    color="secondary"
                                                     variant="outlined"
                                                 />
                                             )}
@@ -189,27 +207,28 @@ function SavedContentsPage() {
                                             ))}
                                         </Box>
                                     </CardContent>
-                                    <Box sx={{ 
-                                        display: 'flex', 
-                                        flexDirection: 'column', 
-                                        justifyContent: 'center', 
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center',
                                         alignItems: 'center',
-                                        borderLeft: { sm: '1px solid rgba(255,255,255,0.1)' }, 
+                                        borderLeft: { sm: '1px solid rgba(255,255,255,0.1)' },
                                         pl: { sm: 2 },
                                         pt: { xs: 2, sm: 0 }
                                     }}>
                                         <Tooltip title="Beğen">
-                                            <IconButton 
-                                                onClick={() => handleInteraction(news.content?.contentId, 'LIKE', news.topicId)} 
+                                            <IconButton
+                                                onClick={() => handleInteraction(news.content?.contentId, 'LIKE', news.topicId)}
                                                 color={likedPosts[news.content?.contentId] ? "error" : "default"}
                                             >
                                                 {likedPosts[news.content?.contentId] ? <FavoriteIcon /> : <FavoriteBorder />}
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="Kaydedildi">
-                                            <IconButton 
+                                            <IconButton
+                                                onClick={() => handleUnsave(news.content?.contentId, news.topicId)}
                                                 color="secondary"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: 'rgba(156, 39, 176, 0.1)',
                                                     '&:hover': { bgcolor: 'rgba(156, 39, 176, 0.2)' }
                                                 }}
@@ -218,8 +237,8 @@ function SavedContentsPage() {
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="Şikayet Et">
-                                            <IconButton 
-                                                onClick={() => handleInteraction(news.content?.contentId, 'REPORT', news.topicId)} 
+                                            <IconButton
+                                                onClick={() => handleInteraction(news.content?.contentId, 'REPORT', news.topicId)}
                                                 color={reportedPosts[news.content?.contentId] ? "error" : "default"}
                                                 disabled={reportedPosts[news.content?.contentId]}
                                             >
@@ -227,9 +246,9 @@ function SavedContentsPage() {
                                             </IconButton>
                                         </Tooltip>
                                         {news.sourceUrl && (
-                                            <Button 
-                                                size="small" 
-                                                href={news.sourceUrl} 
+                                            <Button
+                                                size="small"
+                                                href={news.sourceUrl}
                                                 target="_blank"
                                                 sx={{ mt: 1, fontSize: '0.7rem' }}
                                             >

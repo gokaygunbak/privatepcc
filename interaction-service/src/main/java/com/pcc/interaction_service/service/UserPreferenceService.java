@@ -45,13 +45,13 @@ public class UserPreferenceService {
     public void saveUserPreferences(Long userId, List<Integer> newTopicIds) {
         // 1. Mevcut seçili topic'leri al
         List<Integer> oldTopicIds = preferenceRepository.findTopicIdsByUserId(userId);
-        
+
         // Debug: Mevcut skorları da kontrol et
         List<UserTopicScore> existingScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
         System.out.println("🔍 DEBUG - Mevcut skorlar: " + existingScores.stream()
-            .map(s -> "Topic=" + s.getTopicId() + ",Skor=" + s.getScore())
-            .collect(java.util.stream.Collectors.joining(", ")));
-        
+                .map(s -> "Topic=" + s.getTopicId() + ",Skor=" + s.getScore())
+                .collect(java.util.stream.Collectors.joining(", ")));
+
         Set<Integer> oldSet = new HashSet<>(oldTopicIds);
         Set<Integer> newSet = new HashSet<>(newTopicIds);
 
@@ -93,18 +93,10 @@ public class UserPreferenceService {
         }
 
         // 7. Yeni eklenen topic'lere başlangıç puanı ver (SADECE skor yoksa!)
+        // 7. Yeni eklenen topic'lere puan ekle (Her zaman +5 ekle, varsa üstüne koy)
         for (Integer topicId : addedTopics) {
-            UserTopicScoreId scoreId = new UserTopicScoreId(userId, topicId);
-            
-            // Eğer bu topic için zaten skor varsa, DOKUNMA!
-            if (scoreRepository.existsById(scoreId)) {
-                System.out.println("⏭️ Topic=" + topicId + " için skor zaten var, atlanıyor.");
-                continue;
-            }
-            
-            UserTopicScore newScore = new UserTopicScore(userId, topicId, 5.0);
-            scoreRepository.save(newScore);
-            System.out.println("✨ Yeni skor oluşturuldu: Topic=" + topicId + ", Skor=5.0");
+            System.out.println("➕ Topic=" + topicId + " tercih edildi. +5.0 puan ekleniyor.");
+            updateUserTopicScore(userId, topicId, 5.0);
         }
 
         // 8. Korunan topic'lerin skorlarına DOKUNMA (mevcut skorları koru)
@@ -114,6 +106,45 @@ public class UserPreferenceService {
     // Etkileşimi Kaydet ve Puanla
     @Transactional
     public void recordInteraction(InteractionRequest request) {
+        // SAVE işlemi için özel kontrol: Varsa sil (Unsave), yoksa kaydet
+        if (request.getInteractionType() == UserInteraction.InteractionType.SAVE && request.getContentId() != null) {
+            java.util.List<UserInteraction> existingInteractions = interactionRepository
+                    .findByUserIdAndContentIdAndInteractionType(
+                            request.getUserId(),
+                            request.getContentId(),
+                            UserInteraction.InteractionType.SAVE);
+
+            if (!existingInteractions.isEmpty()) {
+                // VARSA -> HEPSİNİ SİL (Cleanup + Unsave) + PUAN DÜŞ
+                interactionRepository.deleteAll(existingInteractions);
+                System.out.println("🗑️ Unsave işlemi: " + existingInteractions.size() + " interaction silindi.");
+
+                // Topic ID belirle
+                Integer topicId = request.getTopicId();
+                if (topicId == null) {
+                    try {
+                        topicId = llmServiceClient.getTopicIdByContentId(request.getContentId());
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Topic ID alınamadı (Unsave): " + e.getMessage());
+                    }
+                }
+
+                if (topicId != null) {
+                    // Puanı geri al (Negatif skor) - Sadece BIR KERE ve EĞER SKOR VARSA
+                    UserTopicScoreId scoreId = new UserTopicScoreId(request.getUserId(), topicId);
+                    if (scoreRepository.existsById(scoreId)) {
+                        double scoreDeduct = -1.0 * getScoreByInteractionType(UserInteraction.InteractionType.SAVE);
+                        updateUserTopicScore(request.getUserId(), topicId, scoreDeduct);
+                        System.out.println("📉 Puan düşüldü: " + scoreDeduct);
+                    } else {
+                        System.out.println("⚠️ Topic score bulunamadı (Topic=" + topicId + "), puan düşülmedi.");
+                    }
+                }
+
+                return; // İşlem tamam, çık
+            }
+        }
+
         // Etkileşimi Veritabanına Yaz (Loglama)
         UserInteraction interaction = new UserInteraction();
         interaction.setUserId(request.getUserId());
@@ -123,12 +154,13 @@ public class UserPreferenceService {
 
         // Topic ID'yi belirle: Önce request'ten, yoksa LLM Service'den çek
         Integer topicId = request.getTopicId();
-        
+
         if (topicId == null && request.getContentId() != null) {
             try {
                 // ContentId'den Summary'nin topic_id'sini çek
                 topicId = llmServiceClient.getTopicIdByContentId(request.getContentId());
-                System.out.println("🎯 Topic ID LLM Service'den alındı: " + topicId + " (ContentId: " + request.getContentId() + ")");
+                System.out.println("🎯 Topic ID LLM Service'den alındı: " + topicId + " (ContentId: "
+                        + request.getContentId() + ")");
             } catch (Exception e) {
                 System.err.println("⚠️ Topic ID alınamadı: " + e.getMessage());
             }
@@ -190,7 +222,7 @@ public class UserPreferenceService {
     public List<SummaryDto> getPersonalizedFeed(Long userId) {
         // 1. Kullanıcının topic skorlarını çek (en yüksekten en düşüğe)
         List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
-        
+
         if (userScores.isEmpty()) {
             System.out.println("📭 Kullanıcı " + userId + " için hiç skor bulunamadı.");
             return List.of();
@@ -210,8 +242,8 @@ public class UserPreferenceService {
         System.out.println("📊 Kullanıcı " + userId + " için ağırlıklı dağılım:");
         for (UserTopicScore score : userScores) {
             double percentage = (score.getScore() / totalScore) * 100;
-            System.out.println("   Topic " + score.getTopicId() + ": " + 
-                    String.format("%.1f", score.getScore()) + " puan → %" + 
+            System.out.println("   Topic " + score.getTopicId() + ": " +
+                    String.format("%.1f", score.getScore()) + " puan → %" +
                     String.format("%.1f", percentage));
         }
 
@@ -229,7 +261,8 @@ public class UserPreferenceService {
                 .collect(java.util.stream.Collectors.groupingBy(SummaryDto::getTopicId));
 
         // 7. Ağırlıklı rastgele seçim ile feed oluştur
-        List<SummaryDto> personalizedFeed = buildWeightedFeed(userScores, summariesByTopic, totalScore, allSummaries.size());
+        List<SummaryDto> personalizedFeed = buildWeightedFeed(userScores, summariesByTopic, totalScore,
+                allSummaries.size());
 
         System.out.println("✅ " + personalizedFeed.size() + " içerik ağırlıklı algoritma ile sıralandı.");
         return personalizedFeed;
@@ -245,10 +278,10 @@ public class UserPreferenceService {
             java.util.Map<Integer, List<SummaryDto>> summariesByTopic,
             double totalScore,
             int maxItems) {
-        
+
         List<SummaryDto> result = new java.util.ArrayList<>();
         java.util.Random random = new java.util.Random();
-        
+
         // Her topic için kullanılan index'leri takip et (aynı içerik tekrar gelmesin)
         java.util.Map<Integer, Integer> topicIndices = new java.util.HashMap<>();
         for (Integer topicId : summariesByTopic.keySet()) {
@@ -269,24 +302,26 @@ public class UserPreferenceService {
         // Kalan içerikler: Ağırlıklı rastgele seçim
         int attempts = 0;
         int maxAttempts = maxItems * 3; // Sonsuz döngüyü önle
-        
+
         while (result.size() < maxItems && attempts < maxAttempts) {
             attempts++;
-            
+
             // Rastgele bir topic seç (skorlara göre ağırlıklı)
             Integer selectedTopicId = selectWeightedTopic(userScores, totalScore, random);
-            
-            if (selectedTopicId == null) continue;
-            
+
+            if (selectedTopicId == null)
+                continue;
+
             List<SummaryDto> topicSummaries = summariesByTopic.get(selectedTopicId);
-            if (topicSummaries == null) continue;
-            
+            if (topicSummaries == null)
+                continue;
+
             int currentIndex = topicIndices.getOrDefault(selectedTopicId, 0);
-            
+
             // Bu topic'te hala içerik var mı?
             if (currentIndex < topicSummaries.size()) {
                 SummaryDto summary = topicSummaries.get(currentIndex);
-                
+
                 // Daha önce eklenmemişse ekle
                 if (!result.contains(summary)) {
                     result.add(summary);
@@ -306,14 +341,14 @@ public class UserPreferenceService {
     private Integer selectWeightedTopic(List<UserTopicScore> userScores, double totalScore, java.util.Random random) {
         double randomValue = random.nextDouble() * totalScore;
         double cumulative = 0;
-        
+
         for (UserTopicScore score : userScores) {
             cumulative += score.getScore();
             if (randomValue <= cumulative) {
                 return score.getTopicId();
             }
         }
-        
+
         // Fallback: İlk topic
         return userScores.isEmpty() ? null : userScores.get(0).getTopicId();
     }
@@ -322,7 +357,7 @@ public class UserPreferenceService {
     public List<com.pcc.interaction_service.dto.TopicDto> getUserSelectedTopics(Long userId) {
         // 1. Kullanıcının seçtiği topic ID'lerini al
         List<Integer> userTopicIds = preferenceRepository.findTopicIdsByUserId(userId);
-        
+
         if (userTopicIds.isEmpty()) {
             return List.of();
         }
@@ -384,7 +419,8 @@ public class UserPreferenceService {
             return List.of();
         }
 
-        // 2. Unique contentId'leri çıkar (aynı içerik birden fazla şikayet edilmiş olabilir)
+        // 2. Unique contentId'leri çıkar (aynı içerik birden fazla şikayet edilmiş
+        // olabilir)
         List<java.util.UUID> contentIds = reportInteractions.stream()
                 .map(UserInteraction::getContentId)
                 .distinct()

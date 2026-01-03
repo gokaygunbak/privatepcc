@@ -76,13 +76,15 @@ public class GeminiService {
         String topicList = getTopicListForPrompt();
         
         // 2. Gemini için özel Prompt hazırla
-        String prompt = "Aşağıdaki metni analiz et ve Türkçe olarak özetle. " +
-                "Ayrıca bu haberin hangi konuya ait olduğunu belirle. " +
-                "Sadece şu konulardan BİRİNİ seç: [" + topicList + "]. " +
+        String prompt = "Sen bir haber editörüsün. Aşağıdaki haberi özetle. " +
+                "ÖNEMLİ KURALLAR: " +
+                "1. Özet yazarken 'Metin şunu anlatıyor', 'Haber şunu ele alıyor', 'Bu içerik...' gibi analitik ifadeler KULLANMA. " +
+                "2. Doğrudan haberin özünü anlatan, sanki sen haber yazıyormuşsun gibi bir özet yaz. " +
+                "3. Özet 2-3 cümle olsun ve doğrudan konuya girsin. " +
+                "4. Bu haberin konusunu şu listeden seç: [" + topicList + "]. " +
                 "Cevabı SADECE şu JSON formatında ver, başka hiçbir şey yazma: " +
-                "{ \"title\": \"İlgi çekici bir başlık\", \"summary\": \"Kısa özet\", \"tags\": \"teknoloji, yapay zeka\", \"topic_id\": 8 } " +
-                "(topic_id alanına seçtiğin konunun numarasını yaz)" +
-                "\n\nİşte metin:\n" + content.getOriginalText();
+                "{ \"title\": \"Dikkat çekici başlık\", \"summary\": \"Doğrudan özet (analitik dil kullanma)\", \"tags\": \"etiket1, etiket2\", \"topic_id\": 8 } " +
+                "\n\nHaber metni:\n" + content.getOriginalText();
 
         // 3. API İsteğini Hazırla (Gemini'nin istediği JSON yapısı)
         // {"contents": [{"parts": [{"text": "prompt..."}]}]}

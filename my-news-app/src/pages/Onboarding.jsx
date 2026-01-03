@@ -55,7 +55,7 @@ function Onboarding() {
                 try {
                     const prefsResponse = await axios.get(`http://localhost:8080/api/interactions/preferences/${userId}`, {
                         headers: { Authorization: `Bearer ${token}` }
-                    });
+            });
                     // Mevcut tercihleri seçili olarak işaretle
                     if (prefsResponse.data && prefsResponse.data.length > 0) {
                         const existingTopicIds = prefsResponse.data.map(topic => topic.topicId);

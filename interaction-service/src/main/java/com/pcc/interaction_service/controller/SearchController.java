@@ -102,6 +102,16 @@ public class SearchController {
         public void setOriginalText(String originalText) {
             this.originalText = originalText;
         }
+
+        private String url;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
     }
 
     @Data

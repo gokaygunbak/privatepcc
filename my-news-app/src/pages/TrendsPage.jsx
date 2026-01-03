@@ -151,36 +151,36 @@ function TrendsPage() {
 
                 {/* Tag Filter */}
                 {allTags.length > 0 && (
-                    <Box sx={{ width: '100%', maxWidth: 'xl', mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
+                <Box sx={{ width: '100%', maxWidth: 'xl', mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
                         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>
                             Bu sayfadaki konular:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {allTags.map((tag) => (
-                                <Chip
-                                    key={tag}
-                                    label={tag}
-                                    onClick={() => toggleTag(tag)}
-                                    color={selectedTags.includes(tag) ? "primary" : "default"}
-                                    variant={selectedTags.includes(tag) ? "filled" : "outlined"}
-                                    clickable
-                                    size="small"
-                                    sx={{ transition: 'all 0.2s' }}
-                                />
-                            ))}
-                        </Box>
-                        {selectedTags.length > 0 && (
-                            <Button
-                                variant="text"
-                                color="error"
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {allTags.map((tag) => (
+                            <Chip
+                                key={tag}
+                                label={tag}
+                                onClick={() => toggleTag(tag)}
+                                color={selectedTags.includes(tag) ? "primary" : "default"}
+                                variant={selectedTags.includes(tag) ? "filled" : "outlined"}
+                                clickable
                                 size="small"
-                                sx={{ mt: 1.5 }}
-                                onClick={() => setSelectedTags([])}
-                            >
-                                Filtreleri Temizle
-                            </Button>
-                        )}
+                                sx={{ transition: 'all 0.2s' }}
+                            />
+                        ))}
                     </Box>
+                    {selectedTags.length > 0 && (
+                        <Button
+                                variant="text"
+                            color="error"
+                            size="small"
+                                sx={{ mt: 1.5 }}
+                            onClick={() => setSelectedTags([])}
+                        >
+                            Filtreleri Temizle
+                        </Button>
+                    )}
+                </Box>
                 )}
             </Box>
 
@@ -201,19 +201,19 @@ function TrendsPage() {
                     </Grid>
                 ) : (
                     <>
-                        <Grid container spacing={3} alignItems="stretch">
-                            {filteredSummaries.map((news) => (
-                                <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId}>
-                                    <Card sx={{
-                                        width: '100%',
+                    <Grid container spacing={3} alignItems="stretch">
+                        {filteredSummaries.map((news) => (
+                            <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId}>
+                                <Card sx={{
+                                    width: '100%',
                                         height: '100%',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
                                         transition: 'transform 0.2s, box-shadow 0.2s',
-                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
-                                    }}>
-                                        <CardContent sx={{ flexGrow: 1 }}>
+                                    '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 }
+                                }}>
+                                    <CardContent sx={{ flexGrow: 1 }}>
                                             {news.topicName && (
                                                 <Chip 
                                                     label={news.topicName} 
@@ -222,26 +222,26 @@ function TrendsPage() {
                                                     sx={{ mb: 1, fontSize: '0.7rem' }}
                                                 />
                                             )}
-                                            <Typography gutterBottom variant="h6" component="div" color="primary" sx={{
-                                                display: '-webkit-box',
-                                                overflow: 'hidden',
-                                                WebkitBoxOrient: 'vertical',
-                                                WebkitLineClamp: 2,
+                                        <Typography gutterBottom variant="h6" component="div" color="primary" sx={{
+                                            display: '-webkit-box',
+                                            overflow: 'hidden',
+                                            WebkitBoxOrient: 'vertical',
+                                            WebkitLineClamp: 2,
                                                 lineHeight: 1.3,
                                                 minHeight: '2.6em'
-                                            }}>
-                                                {news.title}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{
-                                                mb: 2,
-                                                display: '-webkit-box',
-                                                overflow: 'hidden',
-                                                WebkitBoxOrient: 'vertical',
+                                        }}>
+                                            {news.title}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{
+                                            mb: 2,
+                                            display: '-webkit-box',
+                                            overflow: 'hidden',
+                                            WebkitBoxOrient: 'vertical',
                                                 WebkitLineClamp: 3,
-                                            }}>
-                                                {news.summaryText}
-                                            </Typography>
-                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        }}>
+                                            {news.summaryText}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                                 {news.generatedTags && news.generatedTags.split(',').slice(0, 3).map((tag, i) => (
                                                     <Chip 
                                                         key={i} 
@@ -251,18 +251,18 @@ function TrendsPage() {
                                                         onClick={() => toggleTag(tag.trim())} 
                                                         sx={{ cursor: 'pointer', fontSize: '0.7rem' }} 
                                                     />
-                                                ))}
-                                            </Box>
-                                        </CardContent>
-                                        <Divider />
-                                        <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
-                                            <Box>
-                                                <Tooltip title="Beğen">
+                                            ))}
+                                        </Box>
+                                    </CardContent>
+                                    <Divider />
+                                    <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
+                                        <Box>
+                                            <Tooltip title="Beğen">
                                                     <IconButton onClick={() => handleInteraction(news.content?.contentId, 'LIKE', news.topicId)} color="primary" size="small">
                                                         {likedPosts[news.content?.contentId] ? <FavoriteIcon /> : <FavoriteBorder />}
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Kaydet">
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Kaydet">
                                                     <IconButton onClick={() => handleInteraction(news.content?.contentId, 'SAVE', news.topicId)} color="secondary" size="small">
                                                         {savedPosts[news.content?.contentId] ? <BookmarkIcon /> : <BookmarkBorder />}
                                                     </IconButton>
@@ -275,21 +275,21 @@ function TrendsPage() {
                                                         disabled={reportedPosts[news.content?.contentId]}
                                                     >
                                                         <ReportIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Box>
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
                                             {news.sourceUrl && (
-                                                <Tooltip title="Kaynağa Git">
+                                            <Tooltip title="Kaynağa Git">
                                                     <IconButton href={news.sourceUrl} target="_blank" size="small">
                                                         <LinkIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                        </CardActions>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                    </CardActions>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
 
                         {/* Pagination */}
                         {totalPages > 1 && (

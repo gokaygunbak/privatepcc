@@ -99,6 +99,7 @@ public class SummaryDto {
     // Nested Content DTO
     public static class ContentDto {
         private UUID contentId;
+        private String url;
 
         public UUID getContentId() {
             return contentId;
@@ -106,6 +107,14 @@ public class SummaryDto {
 
         public void setContentId(UUID contentId) {
             this.contentId = contentId;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
         }
     }
 }
