@@ -17,13 +17,22 @@ import {
     Divider,
     CircularProgress
 } from '@mui/material';
-import { 
-    ArrowBack as ArrowBackIcon, 
-    Save as SaveIcon, 
+import {
+    ArrowBack as ArrowBackIcon,
+    Save as SaveIcon,
     AccountCircle as AccountCircleIcon,
     Category as CategoryIcon,
-    Edit as EditIcon
+    Edit as EditIcon,
+    PieChart as PieChartIcon,
+    DeleteForever as DeleteForeverIcon,
+    Warning as WarningIcon
 } from '@mui/icons-material';
+import {
+    PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import {
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
+} from '@mui/material';
 import AuthService from '../services/AuthService';
 import MainLayout from '../components/MainLayout';
 
@@ -41,6 +50,29 @@ const ProfilePage = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [userTopics, setUserTopics] = useState([]);
     const [topicsLoading, setTopicsLoading] = useState(true);
+    const [topicStats, setTopicStats] = useState([]);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [openResetDialog, setOpenResetDialog] = useState(false);
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
+
+    const handleResetAlgorithm = async () => {
+        const userId = AuthService.getCurrentUserId();
+        const token = AuthService.getCurrentToken();
+        try {
+            await axios.post(`http://localhost:8080/api/interactions/reset?userId=${userId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setOpenResetDialog(false);
+            // Onboarding sayfasına yönlendir
+            navigate('/onboarding', { replace: true });
+            window.location.reload(); // State'leri temizlemek için reload iyi olabilir
+        } catch (error) {
+            console.error("Sıfırlama hatası:", error);
+            setSnackbar({ open: true, message: 'Sıfırlama işlemi başarısız oldu.', severity: 'error' });
+            setOpenResetDialog(false);
+        }
+    };
 
     useEffect(() => {
         const userId = AuthService.getCurrentUserId();
@@ -53,6 +85,7 @@ const ProfilePage = () => {
 
         fetchProfile(userId, token);
         fetchUserTopics(userId, token);
+        fetchTopicStats(userId, token);
     }, []);
 
     const fetchProfile = async (userId, token) => {
@@ -85,6 +118,23 @@ const ProfilePage = () => {
             console.error("Hata detayı:", error.response?.data || error.message);
         } finally {
             setTopicsLoading(false);
+        }
+    };
+
+
+    const fetchTopicStats = async (userId, token) => {
+        try {
+            const response = await axios.get(`http://localhost:8080/api/interactions/stats/topic-scores?userId=${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data) {
+                // Skoru 0'dan büyük olanları filtrele
+                setTopicStats(response.data.filter(item => item.score > 0));
+            }
+        } catch (error) {
+            console.error("İstatistikler yüklenirken hata:", error);
+        } finally {
+            setStatsLoading(false);
         }
     };
 
@@ -250,8 +300,8 @@ const ProfilePage = () => {
                                     Seçtiğim İlgi Alanlarım
                                 </Typography>
                             </Box>
-                            <Button 
-                                size="small" 
+                            <Button
+                                size="small"
                                 startIcon={<EditIcon />}
                                 onClick={() => navigate('/onboarding')}
                                 variant="outlined"
@@ -272,8 +322,8 @@ const ProfilePage = () => {
                                         label={topic.name}
                                         color="primary"
                                         variant="outlined"
-                                        sx={{ 
-                                            fontSize: '0.95rem', 
+                                        sx={{
+                                            fontSize: '0.95rem',
                                             py: 2,
                                             borderRadius: 2,
                                             '&:hover': {
@@ -289,8 +339,8 @@ const ProfilePage = () => {
                                 <Typography color="text.secondary" gutterBottom>
                                     Henüz ilgi alanı seçmediniz.
                                 </Typography>
-                                <Button 
-                                    variant="contained" 
+                                <Button
+                                    variant="contained"
                                     size="small"
                                     onClick={() => navigate('/onboarding')}
                                     sx={{ mt: 1 }}
@@ -300,6 +350,105 @@ const ProfilePage = () => {
                             </Box>
                         )}
                     </Box>
+
+                    {/* ETKİLEŞİM ANALİZİ (PASTA GRAFİĞİ) */}
+                    <Divider sx={{ my: 4 }} />
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                            <PieChartIcon color="primary" />
+                            <Typography variant="h6" color="primary">
+                                Etkileşim Analizi
+                            </Typography>
+                        </Box>
+
+                        {statsLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                <CircularProgress size={30} />
+                            </Box>
+                        ) : topicStats.length > 0 ? (
+                            <Box sx={{ height: 300, width: '100%' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={topicStats}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                                            outerRadius={100}
+                                            fill="#8884d8"
+                                            dataKey="score"
+                                            nameKey="topicName"
+                                        >
+                                            {topicStats.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value) => `${value.toFixed(1)} Puan`} />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </Box>
+                        ) : (
+                            <Box sx={{ textAlign: 'center', py: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+                                <Typography color="text.secondary">
+                                    Henüz yeterli etkileşim verisi yok.
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
+
+                    {/* TEHLİKELİ BÖLGE (ALGORİTMA SIFIRLAMA) */}
+                    <Divider sx={{ my: 4 }} />
+                    <Box sx={{
+                        bgcolor: '#fff5f5',
+                        p: 3,
+                        borderRadius: 2,
+                        border: '1px solid #ffcdd2',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        textAlign: 'center'
+                    }}>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteForeverIcon />}
+                            onClick={() => setOpenResetDialog(true)}
+                            sx={{ mb: 2 }}
+                        >
+                            Algoritmamı Sıfırla
+                        </Button>
+                        <Typography variant="body2" color="text.secondary">
+                            Bu işlem, tüm kişiselleştirilmiş verilerinizi (etkileşimler, puanlar, tercihler) kalıcı olarak siler ve
+                            algoritmayı başlangıç ayarlarına döndürür. Bu işlem <b>geri alınamaz</b>.
+                        </Typography>
+                    </Box>
+
+                    {/* Onay Diyaloğu */}
+                    <Dialog
+                        open={openResetDialog}
+                        onClose={() => setOpenResetDialog(false)}
+                    >
+                        <DialogTitle sx={{ color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <WarningIcon /> Algoritma Sıfırlansın mı?
+                        </DialogTitle>
+                        <DialogContent>
+                            <DialogContentText>
+                                Tüm ilgi alanı geçmişiniz, okuma alışkanlıklarınız ve kaydedilen içerikleriniz silinecek.
+                                <br /><br />
+                                <b>Emin misiniz?</b>
+                            </DialogContentText>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setOpenResetDialog(false)} color="inherit">
+                                Vazgeç
+                            </Button>
+                            <Button onClick={handleResetAlgorithm} color="error" variant="contained" autoFocus>
+                                Evet, Sıfırla
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
                 </Paper>
             </Container>
 
@@ -312,8 +461,9 @@ const ProfilePage = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </MainLayout>
+        </MainLayout >
     );
 };
+
 
 export default ProfilePage;

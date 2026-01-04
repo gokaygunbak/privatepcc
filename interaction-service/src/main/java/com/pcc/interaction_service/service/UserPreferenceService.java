@@ -189,14 +189,35 @@ public class UserPreferenceService {
         if (existingScore.isPresent()) {
             scoreEntity = existingScore.get();
             currentScore = scoreEntity.getScore();
-            newScore = currentScore + scoreDelta;
-            scoreEntity.setScore(newScore); // Update logic inside
+
+            // Özel Logic: Eğer scoreDelta -100 ise -> RESET (0 yap)
+            // Eğer scoreDelta -0.7 ise -> %70 AZALT (0.3 ile çarp)
+            if (scoreDelta == -100.0) {
+                newScore = 0.0;
+                System.out.println("⛔️ SKOR SIFIRLANDI (NOT_INTERESTED): User=" + userId + ", Topic=" + topicId);
+            } else if (scoreDelta == -0.7) {
+                newScore = currentScore * 0.3; // %70 azalt
+                System.out.println("📉 SKOR AZALTILDI (SHOW_LESS): " + currentScore + " -> " + newScore);
+            } else {
+                newScore = currentScore + scoreDelta;
+                // Skorun eksiye düşmesini engelle
+                if (newScore < 0) {
+                    newScore = 0.0;
+                }
+            }
+
+            scoreEntity.setScore(newScore);
         } else {
             scoreEntity = new UserTopicScore();
             scoreEntity.setUserId(userId);
             scoreEntity.setTopicId(topicId);
             currentScore = 0.0;
-            newScore = scoreDelta;
+
+            if (scoreDelta == -100.0 || scoreDelta == -0.7) {
+                newScore = 0.0; // Yeni topic ise zaten 0
+            } else {
+                newScore = scoreDelta;
+            }
             scoreEntity.setScore(newScore);
         }
 
@@ -213,7 +234,9 @@ public class UserPreferenceService {
         return switch (type) {
             case LIKE -> 1.0;
             case SAVE -> 2.0;
-            case VIEW -> 0.1;
+            case CLICK -> 0.3;
+            case SHOW_LESS -> -0.7; // Özel işaret: %70 azalt
+            case NOT_INTERESTED -> -100.0; // Özel işaret: Sıfırla
             default -> 0.0;
         };
     }
@@ -440,12 +463,118 @@ public class UserPreferenceService {
     public void deleteContentCompletely(java.util.UUID contentId) {
         System.out.println("🗑️ İçerik siliniyor: " + contentId);
 
-        // 1. Bu içeriğe ait tüm interaction'ları sil (LIKE, SAVE, VIEW, REPORT)
+        // 1. Bu içeriğe ait tüm interaction'ları sil (LIKE, SAVE, REPORT)
         interactionRepository.deleteByContentId(contentId);
         System.out.println("   ✓ Interaction'lar silindi");
 
         // 2. LLM Service'e içeriği silmesini söyle
         llmServiceClient.deleteContent(contentId);
         System.out.println("   ✓ İçerik LLM Service'den silindi");
+    }
+
+    // Admin: Şikayeti Yoksay (Sadece REPORT interaction'larını sil)
+    @Transactional
+    public void dismissReport(java.util.UUID contentId) {
+        System.out.println("🛡️ Şikayet yoksayılıyor: " + contentId);
+        interactionRepository.deleteByContentIdAndInteractionType(contentId, UserInteraction.InteractionType.REPORT);
+        System.out.println("   ✓ REPORT interaction'ları silindi.");
+    }
+
+    // Ağırlıklı Rastgele ve Görülmemiş İçerik Seçimi (Sonsuz Kaydırma İçin)
+    public SummaryDto getNextWeightedContent(Long userId, boolean forceTop) {
+        // 1. Kullanıcının skorlarını çek
+        List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
+
+        Integer targetTopicId = null;
+
+        // 2. Hedef Topic Belirle
+        double totalScore = userScores.stream().mapToDouble(UserTopicScore::getScore).sum();
+
+        if (userScores.isEmpty() || totalScore <= 0) {
+            System.out.println(
+                    "ℹ️ Kullanıcı skoru yok veya toplam skor 0 (Total=" + totalScore + "), rastgele seçim yapılacak.");
+            // targetTopicId = null kalır -> Global Random
+        } else if (forceTop) {
+            // En yüksek skorlu konuyu zorla
+            targetTopicId = userScores.get(0).getTopicId();
+            System.out.println("🥇 Force Top aktif: Topic " + targetTopicId + " seçildi.");
+        } else {
+            // Ağırlıklı rastgele seçim yap
+            java.util.Random random = new java.util.Random();
+            targetTopicId = selectWeightedTopic(userScores, totalScore, random);
+            System.out.println("🎲 Ağırlıklı seçim: Topic " + targetTopicId + " (Total Score: " + totalScore + ")");
+        }
+
+        // 3. LLM Service'den bu topic için içerik iste
+        SummaryDto summary = null;
+        if (targetTopicId != null) {
+            summary = llmServiceClient.getRandomUnseenContent(userId, targetTopicId);
+        }
+
+        // 4. Fallback: Eğer seçilen topic'te içerik kalmadıysa veya topic null ise
+        if (summary == null) {
+            System.out.println(
+                    "⚠️ Topic " + targetTopicId + " için içerik kalmadı veya bulunamadı. Fallback: Global Random.");
+            // TopicID olmadan (null) global random iste
+            summary = llmServiceClient.getRandomUnseenContent(userId, null);
+        }
+
+        return summary;
+    }
+
+    // Kullanıcının Topic İstatistiklerini Getir
+    public List<com.pcc.interaction_service.dto.TopicScoreDto> getUserTopicStats(Long userId) {
+        List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
+
+        if (userScores.isEmpty()) {
+            return List.of();
+        }
+
+        // 1. Toplam skoru hesapla
+        double totalScore = userScores.stream()
+                .mapToDouble(UserTopicScore::getScore)
+                .sum();
+
+        // 2. Tüm konuları çek (isimleri almak için)
+        List<com.pcc.interaction_service.dto.TopicDto> allTopics = llmServiceClient.getAllTopics();
+        java.util.Map<Integer, String> topicNames = allTopics.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.pcc.interaction_service.dto.TopicDto::getTopicId,
+                        com.pcc.interaction_service.dto.TopicDto::getName));
+
+        // 3. DTO'ları oluştur
+        List<com.pcc.interaction_service.dto.TopicScoreDto> stats = new ArrayList<>();
+        for (UserTopicScore score : userScores) {
+            double percentage = (totalScore > 0) ? (score.getScore() / totalScore) * 100 : 0;
+            String name = topicNames.getOrDefault(score.getTopicId(), "Bilinmeyen Konu");
+
+            stats.add(new com.pcc.interaction_service.dto.TopicScoreDto(
+                    score.getTopicId(),
+                    name,
+                    score.getScore(),
+                    percentage));
+        }
+
+        return stats;
+    }
+
+    // Kullanıcının Tüm Verilerini Sıfırla (Reset Algorithm)
+    @Transactional
+    public void resetUserAlgorithm(Long userId) {
+        System.out.println("🧨 ALGORİTMA SIFIRLANIYOR: User=" + userId);
+
+        // 1. Tüm Interaction'ları sil
+        interactionRepository.deleteByUserId(userId);
+        System.out.println("   ✓ Interaction'lar silindi.");
+
+        // 2. Tüm Topic Skorlarını sil
+        scoreRepository.deleteByUserId(userId);
+        System.out.println("   ✓ Skorlar silindi.");
+
+        // 3. Tüm Tercihleri sil
+        preferenceRepository.deleteAllByUserId(userId);
+        System.out.println("   ✓ Tercihler silindi.");
+
+        System.out.println("✅ Kullanıcı verileri tamamen temizlendi.");
     }
 }

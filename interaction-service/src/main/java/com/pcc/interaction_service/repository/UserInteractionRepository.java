@@ -32,4 +32,10 @@ public interface UserInteractionRepository extends JpaRepository<UserInteraction
 
         // REPORT hariç tüm etkileşimleri say (LIKE, SAVE, VIEW)
         long countByInteractionTypeNot(UserInteraction.InteractionType type);
+
+        // Belirli bir içeriğe ait tüm REPORT interaction'larını sil (Dismiss Report)
+        void deleteByContentIdAndInteractionType(UUID contentId, UserInteraction.InteractionType type);
+
+        // Kullanıcının tüm interaction'larını sil (Reset Algorithm)
+        void deleteByUserId(Long userId);
 }

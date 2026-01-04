@@ -29,7 +29,8 @@ import {
     ArrowBack as ArrowBackIcon,
     Report as ReportIcon,
     Delete as DeleteIcon,
-    Warning as WarningIcon
+    Warning as WarningIcon,
+    Cancel as CancelIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
@@ -148,6 +149,46 @@ const AdminPage = () => {
         }
     };
 
+    const handleDismissReport = async (contentId) => {
+        if (!window.confirm("Bu şikayeti yoksaymak (silmek) istediğinize emin misiniz? İçerik silinmeyecek.")) {
+            return;
+        }
+
+        setDeleting(prev => ({ ...prev, [contentId]: true }));
+
+        try {
+            const token = AuthService.getCurrentToken();
+            await axios.delete(`http://localhost:8080/api/interactions/reports/${contentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // UI'dan kaldır
+            setReportedContents(prev => prev.filter(item => item.content?.contentId !== contentId));
+            alert("Şikayet başarıyla kaldırıldı (yoksayıldı).");
+        } catch (err) {
+            console.error('Şikayet silme hatası:', err);
+            alert("İşlem sırasında hata oluştu: " + (err.response?.data || err.message));
+            setDeleting(prev => ({ ...prev, [contentId]: false }));
+        }
+    };
+
+    const handleStartAIProcessing = async () => {
+        if (!window.confirm("Yapay Zeka özetleme işlemini başlatmak istiyor musunuz? Bu işlem arka planda çalışacaktır.")) {
+            return;
+        }
+
+        try {
+            const token = AuthService.getCurrentToken();
+            await axios.get('http://localhost:8080/api/llm/start-processing', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("Yapay zeka işleme başladı! Konsolu takip edebilirsiniz.");
+        } catch (err) {
+            console.error('AI trigger error:', err);
+            alert("İşlem başlatılamadı: " + (err.response?.data || err.message));
+        }
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -187,7 +228,7 @@ const AdminPage = () => {
             {/* İstatistik Kartları */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
+                    <Card sx={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: 'white'
                     }}>
@@ -208,7 +249,7 @@ const AdminPage = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
+                    <Card sx={{
                         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                         color: 'white'
                     }}>
@@ -229,7 +270,7 @@ const AdminPage = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
+                    <Card sx={{
                         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                         color: 'white'
                     }}>
@@ -250,7 +291,7 @@ const AdminPage = () => {
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ 
+                    <Card sx={{
                         background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
                         color: 'white'
                     }}>
@@ -280,10 +321,10 @@ const AdminPage = () => {
                     Şikayet Edilen İçerikler
                 </Typography>
                 {reportedContents.length > 0 && (
-                    <Chip 
-                        label={reportedContents.length} 
-                        color="error" 
-                        size="small" 
+                    <Chip
+                        label={reportedContents.length}
+                        color="error"
+                        size="small"
                         sx={{ ml: 2 }}
                     />
                 )}
@@ -308,7 +349,7 @@ const AdminPage = () => {
                             {reportedContents.map((content) => (
                                 <TableRow key={content.summaryId || content.content?.contentId} hover>
                                     <TableCell sx={{ maxWidth: 200 }}>
-                                        <Typography variant="body2" sx={{ 
+                                        <Typography variant="body2" sx={{
                                             fontWeight: 'bold',
                                             display: '-webkit-box',
                                             overflow: 'hidden',
@@ -335,7 +376,7 @@ const AdminPage = () => {
                                     </TableCell>
                                     <TableCell sx={{ textAlign: 'center' }}>
                                         <Tooltip title="İçeriği Sil">
-                                            <IconButton 
+                                            <IconButton
                                                 color="error"
                                                 onClick={() => handleDeleteContent(content.content?.contentId)}
                                                 disabled={deleting[content.content?.contentId]}
@@ -345,6 +386,16 @@ const AdminPage = () => {
                                                 ) : (
                                                     <DeleteIcon />
                                                 )}
+
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Şikayeti Yoksay (Sil)">
+                                            <IconButton
+                                                color="warning"
+                                                onClick={() => handleDismissReport(content.content?.contentId)}
+                                                disabled={deleting[content.content?.contentId]}
+                                            >
+                                                <CancelIcon />
                                             </IconButton>
                                         </Tooltip>
                                     </TableCell>
@@ -384,16 +435,26 @@ const AdminPage = () => {
 
             {/* Gelecekte eklenebilecek özellikler */}
             <Box sx={{ mt: 4, p: 3, bgcolor: 'grey.100', borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary' }}>
-                    🚧 Geliştirme Aşamasında
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" color="text.secondary">
+                        🚧 Geliştirme Aşamasında
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        startIcon={<TrendingUpIcon />}
+                        onClick={handleStartAIProcessing}
+                    >
+                        Yapay Zeka İşlemini Başlat
+                    </Button>
+                </Box>
                 <Typography variant="body2" color="text.secondary">
                     • Kullanıcı yönetimi (ban, rol değiştirme)<br />
                     • Detaylı istatistikler ve grafikler<br />
                     • RSS kaynak yönetimi
                 </Typography>
             </Box>
-        </Box>
+        </Box >
     );
 };
 

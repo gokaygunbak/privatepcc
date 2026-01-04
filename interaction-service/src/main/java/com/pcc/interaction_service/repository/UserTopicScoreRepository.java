@@ -20,4 +20,7 @@ public interface UserTopicScoreRepository extends JpaRepository<UserTopicScore, 
 
     // Kullanıcının tüm skorlarını sil (Onboarding tekrarında)
     void deleteAllByUserId(Long userId);
+
+    // Alias for consistency
+    void deleteByUserId(Long userId);
 }

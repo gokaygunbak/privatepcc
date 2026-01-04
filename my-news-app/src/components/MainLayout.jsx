@@ -47,7 +47,7 @@ const MainLayout = ({ children, title = "🔍 Keşfet" }) => {
                     onClick={() => navigate("/trends")}
                     sx={{ justifyContent: 'flex-start', mb: 1, color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(3, 136, 166, 0.1)' } }}
                 >
-                    Bu Günlerde
+                    Genel Bakış
                 </Button>
                 <Button
                     fullWidth
@@ -89,7 +89,7 @@ const MainLayout = ({ children, title = "🔍 Keşfet" }) => {
                 >
                     Profilim
                 </Button>
-                
+
                 {/* Admin butonu - sadece ADMIN rolü için görünür */}
                 {AuthService.isAdmin() && (
                     <Button

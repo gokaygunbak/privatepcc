@@ -2,16 +2,17 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import {
-    Typography, Button, Container, Grid, Card, CardContent,
-    Chip, Box, IconButton, Skeleton, Tooltip, Alert
-} from '@mui/material';
-import {
     Favorite as FavoriteIcon,
     Bookmark as BookmarkIcon,
     FavoriteBorder, BookmarkBorder,
     Report as ReportIcon,
-    Link as LinkIcon
+    Link as LinkIcon,
+    SentimentDissatisfied
 } from '@mui/icons-material';
+import {
+    Typography, Button, Container, Grid, Card, CardContent,
+    Chip, Box, IconButton, Skeleton, Tooltip, Alert, Menu, MenuItem
+} from '@mui/material';
 import AuthService from '../services/AuthService';
 import MainLayout from '../components/MainLayout';
 
@@ -29,6 +30,25 @@ const MyFeed = () => {
     const [savedPosts, setSavedPosts] = useState({});
     const [reportedPosts, setReportedPosts] = useState({});
 
+    // Negative Feedback Menu State
+    const [anchorEl, setAnchorEl] = useState(null);
+    const openMenu = Boolean(anchorEl);
+
+    const handleMenuClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleNegativeFeedback = (type) => {
+        if (currentNews) {
+            handleInteraction(currentNews.content?.contentId, type, currentNews.topicId);
+            handleMenuClose();
+        }
+    };
+
     useEffect(() => {
         const token = AuthService.getCurrentToken();
         const userId = AuthService.getCurrentUserId();
@@ -41,16 +61,21 @@ const MyFeed = () => {
             setLoading(false);
             return;
         }
-        fetchPersonalFeed(token, userId);
+        fetchInitialContent(token, userId);
     }, []);
 
-    const fetchPersonalFeed = async (token, userId) => {
+    const fetchInitialContent = async (token, userId) => {
         try {
-            // Kişiselleştirilmiş akış isteği
-            const response = await axios.get(`http://localhost:8080/api/interactions/feed?userId=${userId}`, {
+            // İlk içeriği çek (Rastgele ve görülmemiş, EN YÜKSEK SKORLU konudan olsun)
+            const response = await axios.get(`http://localhost:8080/api/interactions/feed/next-random?userId=${userId}&forceTop=true`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setSummaries(response.data);
+            if (response.status === 204 || !response.data) {
+                setError("Gösterilecek yeni içerik kalmadı!");
+                setLoading(false);
+                return;
+            }
+            setSummaries([response.data]);
             setLoading(false);
         } catch (error) {
             console.error("Hata:", error);
@@ -58,9 +83,29 @@ const MyFeed = () => {
                 AuthService.logout();
                 navigate("/");
             }
-            // Eğer liste boşsa 404 dönebilir veya boş liste dönebilir
-            setError("Kişisel akışınız yüklenirken bir sorun oluştu veya henüz ilgi alanı seçmediniz.");
+            setError("İçerik yüklenirken bir sorun oluştu.");
             setLoading(false);
+        }
+    };
+
+    const fetchNextContent = async () => {
+        const token = AuthService.getCurrentToken();
+        const userId = AuthService.getCurrentUserId();
+        try {
+            const response = await axios.get(`http://localhost:8080/api/interactions/feed/next-random?userId=${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.status === 204 || !response.data) {
+                alert("Başka içerik kalmadı!");
+                return;
+            }
+
+            // Yeni içeriği listeye ekle ve indexi ilerlet
+            setSummaries(prev => [...prev, response.data]);
+            setCurrentIndex(prev => prev + 1);
+        } catch (error) {
+            console.error("Sonraki içerik hatası:", error);
         }
     };
 
@@ -101,8 +146,12 @@ const MyFeed = () => {
     };
 
     const handleNext = () => {
+        // Eğer zaten hafızada sonraki eleman varsa ona geç
         if (currentIndex < summaries.length - 1) {
             setCurrentIndex(prev => prev + 1);
+        } else {
+            // Yoksa yenisini çek
+            fetchNextContent();
         }
     };
 
@@ -244,6 +293,30 @@ const MyFeed = () => {
                                                         <ReportIcon />
                                                     </IconButton>
                                                 </Tooltip>
+
+                                                {/* Negative Feedback Menu */}
+                                                <Box component="span">
+                                                    <Tooltip title="Daha Az Göster / İlgilenmiyorum">
+                                                        <IconButton
+                                                            onClick={handleMenuClick}
+                                                            color="default"
+                                                        >
+                                                            <SentimentDissatisfied />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Menu
+                                                        anchorEl={anchorEl}
+                                                        open={openMenu}
+                                                        onClose={handleMenuClose}
+                                                    >
+                                                        <MenuItem onClick={() => handleNegativeFeedback('SHOW_LESS')}>
+                                                            Bu konuyu daha az göster
+                                                        </MenuItem>
+                                                        <MenuItem onClick={() => handleNegativeFeedback('NOT_INTERESTED')}>
+                                                            Artık ilgilenmiyorum
+                                                        </MenuItem>
+                                                    </Menu>
+                                                </Box>
                                             </Box>
 
                                             <Box>
@@ -254,6 +327,7 @@ const MyFeed = () => {
                                                         startIcon={<LinkIcon />}
                                                         href={currentNews.sourceUrl || currentNews.content?.url}
                                                         target="_blank"
+                                                        onClick={() => handleInteraction(currentNews.content?.contentId, 'CLICK', currentNews.topicId)}
                                                         sx={{ borderRadius: 4 }}
                                                     >
                                                         Kaynağa Git
@@ -263,24 +337,22 @@ const MyFeed = () => {
                                         </Box>
                                     </Card>
 
-                                    {/* İleri Butonu (Kartın Sağında) */}
-                                    {currentIndex < summaries.length - 1 && (
-                                        <IconButton
-                                            onClick={handleNext}
-                                            sx={{
-                                                bgcolor: 'primary.main',
-                                                color: 'white',
-                                                width: 56,
-                                                height: 56,
-                                                boxShadow: 4,
-                                                '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.1)' },
-                                                transition: 'all 0.2s',
-                                                display: { xs: 'none', md: 'flex' } // Mobilde gizle (veya alta al)
-                                            }}
-                                        >
-                                            <Typography variant="h4" sx={{ mb: 0.5 }}>›</Typography>
-                                        </IconButton>
-                                    )}
+                                    {/* İleri Butonu (Hep göster - loading değilse) */}
+                                    <IconButton
+                                        onClick={handleNext}
+                                        sx={{
+                                            bgcolor: 'primary.main',
+                                            color: 'white',
+                                            width: 56,
+                                            height: 56,
+                                            boxShadow: 4,
+                                            '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.1)' },
+                                            transition: 'all 0.2s',
+                                            display: { xs: 'none', md: 'flex' }
+                                        }}
+                                    >
+                                        <Typography variant="h4" sx={{ mb: 0.5 }}>›</Typography>
+                                    </IconButton>
                                 </Box>
 
                                 {/* Mobil İçin Navigasyon */}
@@ -297,33 +369,17 @@ const MyFeed = () => {
                                         </Button>
                                     )}
 
-                                    {currentIndex < summaries.length - 1 ? (
-                                        <Button
-                                            variant="contained"
-                                            onClick={handleNext}
-                                            size="large"
-                                            fullWidth
-                                            sx={{ borderRadius: 8, py: 1.5 }}
-                                        >
-                                            Sıradaki
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="contained"
-                                            disabled
-                                            size="large"
-                                            fullWidth
-                                            sx={{ borderRadius: 8, py: 1.5 }}
-                                        >
-                                            Bitti
-                                        </Button>
-                                    )}
+                                    <Button
+                                        variant="contained"
+                                        onClick={handleNext}
+                                        size="large"
+                                        fullWidth
+                                        sx={{ borderRadius: 8, py: 1.5 }}
+                                    >
+                                        Sıradaki
+                                    </Button>
                                 </Box>
-                                {currentIndex === summaries.length - 1 && (
-                                    <Alert severity="success" sx={{ width: '100%', mt: 2 }}>
-                                        Tüm önerileri incelediniz!
-                                    </Alert>
-                                )}
+
                             </>
                         ) : (
                             !loading && summaries.length > 0 && (

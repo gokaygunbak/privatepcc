@@ -22,13 +22,13 @@ public class UserInteraction {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "interaction_type")
-    private InteractionType interactionType; // LIKE, SAVE, VIEW
+    private InteractionType interactionType; // LIKE, SAVE, REPORT
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum InteractionType {
-        LIKE, SAVE, VIEW, REPORT
+        LIKE, SAVE, CLICK, SHOW_LESS, NOT_INTERESTED, REPORT
     }
 
     public UserInteraction() {

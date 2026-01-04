@@ -10,7 +10,8 @@ import {
     Bookmark as BookmarkIcon,
     FavoriteBorder, BookmarkBorder,
     BookmarkRemove as BookmarkRemoveIcon,
-    Report as ReportIcon
+    Report as ReportIcon,
+    Link as LinkIcon
 } from '@mui/icons-material';
 import AuthService from '../services/AuthService';
 import MainLayout from '../components/MainLayout';
@@ -246,14 +247,17 @@ function SavedContentsPage() {
                                             </IconButton>
                                         </Tooltip>
                                         {news.sourceUrl && (
-                                            <Button
-                                                size="small"
-                                                href={news.sourceUrl}
-                                                target="_blank"
-                                                sx={{ mt: 1, fontSize: '0.7rem' }}
-                                            >
-                                                Kaynağa Git
-                                            </Button>
+                                            <Tooltip title="Kaynağa Git">
+                                                <IconButton
+                                                    href={news.sourceUrl}
+                                                    target="_blank"
+                                                    size="small"
+                                                    onClick={() => handleInteraction(news.content?.contentId, 'CLICK', news.topicId)}
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    <LinkIcon />
+                                                </IconButton>
+                                            </Tooltip>
                                         )}
                                     </Box>
                                 </Card>

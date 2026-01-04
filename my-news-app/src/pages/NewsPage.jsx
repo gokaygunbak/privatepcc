@@ -12,8 +12,11 @@ import {
   Favorite as FavoriteIcon,
   Bookmark as BookmarkIcon,
   Link as LinkIcon,
-  FavoriteBorder, BookmarkBorder
+  FavoriteBorder, BookmarkBorder,
+  Report as ReportIcon
 } from '@mui/icons-material';
+
+import AuthService from '../services/AuthService';
 
 const drawerWidth = 240;
 
@@ -24,13 +27,14 @@ function NewsPage() {
   // Interaction states
   const [likedPosts, setLikedPosts] = useState({});
   const [savedPosts, setSavedPosts] = useState({});
+  const [reportedPosts, setReportedPosts] = useState({});
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
 
     setLoading(true);
-    const token = localStorage.getItem("user_token");
+    const token = AuthService.getCurrentToken();
 
     try {
       // Calls the new orchestration endpoint
@@ -52,12 +56,16 @@ function NewsPage() {
       setLikedPosts(prev => ({ ...prev, [id]: !prev[id] }));
     } else if (type === 'SAVE') {
       setSavedPosts(prev => ({ ...prev, [id]: !prev[id] }));
+    } else if (type === 'REPORT') {
+      if (!window.confirm("Bu içeriği bildirmek istediğinize emin misiniz?")) return;
+      setReportedPosts(prev => ({ ...prev, [id]: true }));
     }
 
     try {
-      const token = localStorage.getItem("user_token");
+      const token = AuthService.getCurrentToken();
+      const userId = AuthService.getCurrentUserId();
       await axios.post('http://localhost:8080/api/interactions/interact', {
-        userId: 1, // Dynamic ID TODO
+        userId: userId,
         contentId: id,
         interactionType: type,
         topicId: topicId
@@ -161,19 +169,33 @@ function NewsPage() {
                     <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
                       <Box>
                         <Tooltip title="Beğen">
-                          <IconButton onClick={() => handleInteraction(news.summaryId, 'LIKE', news.topicId)} color="primary">
-                            {likedPosts[news.summaryId] ? <FavoriteIcon /> : <FavoriteBorder />}
+                          <IconButton onClick={() => handleInteraction(news.content?.contentId, 'LIKE', news.topicId)} color="primary">
+                            {likedPosts[news.content?.contentId] ? <FavoriteIcon /> : <FavoriteBorder />}
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Kaydet">
-                          <IconButton onClick={() => handleInteraction(news.summaryId, 'SAVE', news.topicId)} color="secondary">
-                            {savedPosts[news.summaryId] ? <BookmarkIcon /> : <BookmarkBorder />}
+                          <IconButton onClick={() => handleInteraction(news.content?.contentId, 'SAVE', news.topicId)} color="secondary">
+                            {savedPosts[news.content?.contentId] ? <BookmarkIcon /> : <BookmarkBorder />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Şikayet Et">
+                          <IconButton
+                            onClick={() => handleInteraction(news.content?.contentId, 'REPORT', news.topicId)}
+                            color={reportedPosts[news.content?.contentId] ? "error" : "default"}
+                            disabled={reportedPosts[news.content?.contentId]}
+                          >
+                            <ReportIcon />
                           </IconButton>
                         </Tooltip>
                       </Box>
                       {news.content && news.content.url && (
                         <Tooltip title="Kaynağa Git">
-                          <IconButton href={news.content.url} target="_blank" size="small">
+                          <IconButton
+                            href={news.content.url}
+                            target="_blank"
+                            size="small"
+                            onClick={() => handleInteraction(news.content?.contentId, 'CLICK', news.topicId)}
+                          >
                             <LinkIcon />
                           </IconButton>
                         </Tooltip>

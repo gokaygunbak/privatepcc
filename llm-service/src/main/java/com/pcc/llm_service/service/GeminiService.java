@@ -7,7 +7,10 @@ import com.pcc.llm_service.model.Summary;
 import com.pcc.llm_service.model.Topic;
 import com.pcc.llm_service.repository.ContentRepository;
 import com.pcc.llm_service.repository.SummaryRepository;
+
 import com.pcc.llm_service.repository.TopicRepository;
+import com.pcc.llm_service.repository.ViewHistoryRepository;
+import com.pcc.llm_service.model.ViewHistory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -23,7 +26,9 @@ public class GeminiService {
 
     private final ContentRepository contentRepository;
     private final SummaryRepository summaryRepository;
+
     private final TopicRepository topicRepository;
+    private final ViewHistoryRepository viewHistoryRepository;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -34,10 +39,12 @@ public class GeminiService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper(); // JSON işlemek için
 
-    public GeminiService(ContentRepository contentRepository, SummaryRepository summaryRepository, TopicRepository topicRepository) {
+    public GeminiService(ContentRepository contentRepository, SummaryRepository summaryRepository,
+            TopicRepository topicRepository, ViewHistoryRepository viewHistoryRepository) {
         this.contentRepository = contentRepository;
         this.summaryRepository = summaryRepository;
         this.topicRepository = topicRepository;
+        this.viewHistoryRepository = viewHistoryRepository;
     }
 
     /**
@@ -74,16 +81,18 @@ public class GeminiService {
     private void processSingleContent(Content content) {
         // Topic listesini veritabanından çek
         String topicList = getTopicListForPrompt();
-        
+
         // 2. Gemini için özel Prompt hazırla
         String prompt = "Sen bir haber editörüsün. Aşağıdaki haberi özetle. " +
                 "ÖNEMLİ KURALLAR: " +
-                "1. Özet yazarken 'Metin şunu anlatıyor', 'Haber şunu ele alıyor', 'Bu içerik...' gibi analitik ifadeler KULLANMA. " +
+                "1. Özet yazarken 'Metin şunu anlatıyor', 'Haber şunu ele alıyor', 'Bu içerik...' gibi analitik ifadeler KULLANMA. "
+                +
                 "2. Doğrudan haberin özünü anlatan, sanki sen haber yazıyormuşsun gibi bir özet yaz. " +
                 "3. Özet 2-3 cümle olsun ve doğrudan konuya girsin. " +
                 "4. Bu haberin konusunu şu listeden seç: [" + topicList + "]. " +
                 "Cevabı SADECE şu JSON formatında ver, başka hiçbir şey yazma: " +
-                "{ \"title\": \"Dikkat çekici başlık\", \"summary\": \"Doğrudan özet (analitik dil kullanma)\", \"tags\": \"etiket1, etiket2\", \"topic_id\": 8 } " +
+                "{ \"title\": \"Dikkat çekici başlık\", \"summary\": \"Doğrudan özet (analitik dil kullanma)\", \"tags\": \"etiket1, etiket2\", \"topic_id\": 8 } "
+                +
                 "\n\nHaber metni:\n" + content.getOriginalText();
 
         // 3. API İsteğini Hazırla (Gemini'nin istediği JSON yapısı)
@@ -156,5 +165,49 @@ public class GeminiService {
         } catch (Exception e) {
             System.err.println("JSON Parse Hatası (" + content.getContentId() + "): " + e.getMessage());
         }
+    }
+
+    // Rastgele ve daha önce görülmemiş bir içerik getir, getirirken "Görüldü"
+    // olarak işaretle
+    // Rastgele ve daha önce görülmemiş bir içerik getir (Opsiyonel Topic ID ile)
+    public java.util.Optional<Summary> getAndLogRandomUnseenContent(Long userId, Integer topicId) {
+        java.util.Optional<Summary> summaryOpt;
+
+        if (topicId != null) {
+            // Belirli bir topic için ara
+            summaryOpt = summaryRepository.findRandomUnseenSummaryByTopic(userId, topicId);
+        } else {
+            // Tamamen rastgele ara
+            summaryOpt = summaryRepository.findRandomUnseenSummary(userId);
+        }
+
+        if (summaryOpt.isPresent()) {
+            Summary summary = summaryOpt.get();
+            // Görüldü geçmişine kaydet
+            try {
+                if (summary.getContent() != null) {
+                    ViewHistory history = new ViewHistory();
+                    history.setUserId(userId);
+                    history.setContentId(summary.getContent().getContentId());
+                    viewHistoryRepository.save(history);
+                    System.out.println("👁️ İçerik görüldü olarak işaretlendi: User=" + userId + ", Content="
+                            + summary.getContent().getContentId() + ", Topic="
+                            + (topicId != null ? topicId : "Random"));
+                }
+            } catch (Exception e) {
+                System.err.println("Görüldü geçmişi kaydedilemedi: " + e.getMessage());
+            }
+        } else {
+            System.out.println(
+                    "🚫 Kullanıcı " + userId + " için " + (topicId != null ? "Topic " + topicId + " konusunda " : "")
+                            + "gösterilecek yeni içerik kalmadı!");
+        }
+
+        return summaryOpt;
+    }
+
+    // Geriye uyumluluk için overload
+    public java.util.Optional<Summary> getAndLogRandomUnseenContent(Long userId) {
+        return getAndLogRandomUnseenContent(userId, null);
     }
 }

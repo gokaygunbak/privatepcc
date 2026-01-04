@@ -34,4 +34,9 @@ public interface LlmServiceClient {
     // Admin: İçeriği sil (summary ve content)
     @DeleteMapping("/api/llm/content/{contentId}")
     void deleteContent(@PathVariable("contentId") java.util.UUID contentId);
+
+    // Rastgele ve daha önce görülmemiş içerik getir
+    @GetMapping("/api/llm/feed/random-unseen")
+    SummaryDto getRandomUnseenContent(@RequestParam("userId") Long userId,
+            @RequestParam(value = "topicId", required = false) Integer topicId);
 }

@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import com.pcc.llm_service.dto.TrendsRequest;
+import com.pcc.llm_service.dto.TrendsResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,14 +27,13 @@ public class LlmController {
     private final ContentRepository contentRepository;
     private final TopicRepository topicRepository;
 
-    public LlmController(GeminiService geminiService, SummaryRepository summaryRepository, 
-                         ContentRepository contentRepository, TopicRepository topicRepository) {
+    public LlmController(GeminiService geminiService, SummaryRepository summaryRepository,
+            ContentRepository contentRepository, TopicRepository topicRepository) {
         this.geminiService = geminiService;
         this.summaryRepository = summaryRepository;
         this.contentRepository = contentRepository;
         this.topicRepository = topicRepository;
     }
-
 
     @GetMapping("/start-processing")
     public String startProcessing() {
@@ -55,7 +56,6 @@ public class LlmController {
         Page<Summary> summaryPage = summaryRepository.findAllByOrderByPublishedDateDesc(pageable);
         return ResponseEntity.ok(summaryPage);
     }
-
 
     // Frontend'de kullanıcıya "Hangi konuları seversin?" diye sormak için
     // konuları listele
@@ -88,14 +88,15 @@ public class LlmController {
         if (contentIds == null || contentIds.isEmpty()) {
             return ResponseEntity.ok(List.of());
         }
-        
+
         List<Summary> summaries = summaryRepository.findAll().stream()
                 .filter(s -> s.getContent() != null && contentIds.contains(s.getContent().getContentId()))
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(summaries);
     }
 
-    // İsteğe Bağlı Arama İçin: ID listesi verilen içerikleri özetle (yoksa) ve getir
+    // İsteğe Bağlı Arama İçin: ID listesi verilen içerikleri özetle (yoksa) ve
+    // getir
     @PostMapping("/summarize-batch")
     public ResponseEntity<List<Summary>> summarizeBatch(@RequestBody List<java.util.UUID> contentIds) {
         // Önce bu içeriklerin özetleri zaten var mı kontrol et, olmayanları oluştur
@@ -124,21 +125,21 @@ public class LlmController {
     public ResponseEntity<String> deleteContent(@PathVariable java.util.UUID contentId) {
         try {
             System.out.println("🗑️ LLM Service: İçerik siliniyor -> " + contentId);
-            
+
             // 1. Önce bu içeriğe ait summary'yi sil
             Summary summary = summaryRepository.findByContentId(contentId);
             if (summary != null) {
                 summaryRepository.delete(summary);
                 System.out.println("   ✓ Summary silindi");
             }
-            
+
             // 2. Sonra content'i sil
             Content content = contentRepository.findById(contentId).orElse(null);
             if (content != null) {
                 contentRepository.delete(content);
                 System.out.println("   ✓ Content silindi");
             }
-            
+
             return ResponseEntity.ok("İçerik başarıyla silindi.");
         } catch (Exception e) {
             System.err.println("❌ Silme hatası: " + e.getMessage());
@@ -146,9 +147,42 @@ public class LlmController {
         }
     }
 
+    // Yeni Endpoint: Kullanıcıya özel rastgele ve görülmemiş içerik getir
+    // (Opsiyonel Topic ID ile)
+    @GetMapping("/feed/random-unseen")
+    public ResponseEntity<Summary> getRandomUnseenContent(@RequestParam Long userId,
+            @RequestParam(required = false) Integer topicId) {
+        java.util.Optional<Summary> summary = geminiService.getAndLogRandomUnseenContent(userId, topicId);
+        return summary.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     // Admin: Toplam özet (summary) sayısını getir
     @GetMapping("/stats/summary-count")
     public ResponseEntity<Long> getSummaryCount() {
         return ResponseEntity.ok(summaryRepository.count());
+    }
+
+    // --- Trends Page Endpoint ---
+    @PostMapping("/feed/trends")
+    public ResponseEntity<TrendsResponse> getTrendsFeed(@RequestBody TrendsRequest request) {
+        Long userId = request.getUserId();
+        int size = request.getSize();
+        if (size <= 0)
+            size = 10;
+
+        // 1. Toplam görülmemiş içerik sayısını hesapla
+        long totalElements = summaryRepository.countUnseenSummaries(userId);
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
+        List<Summary> summaries;
+        // 2. İçerikleri çek
+        if (request.getExcludeIds() == null || request.getExcludeIds().isEmpty()) {
+            summaries = summaryRepository.findRandomUnseenSummaries(userId, size);
+        } else {
+            summaries = summaryRepository.findRandomUnseenSummariesWithExclusion(userId, request.getExcludeIds(), size);
+        }
+
+        return ResponseEntity.ok(new TrendsResponse(summaries, totalPages, totalElements));
     }
 }
