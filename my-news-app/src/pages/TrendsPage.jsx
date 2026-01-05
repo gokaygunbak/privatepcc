@@ -231,7 +231,7 @@ function TrendsPage() {
                     <>
                         <Grid container spacing={3} alignItems="stretch">
                             {filteredSummaries.map((news) => (
-                                <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId} sx={{ display: 'flex' }}>
+                                <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId} sx={{width: '100%', display: 'flex' }}>
                                     <Card sx={{
                                         width: '100%',
                                         height: '100%',

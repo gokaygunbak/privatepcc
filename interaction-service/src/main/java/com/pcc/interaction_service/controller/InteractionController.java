@@ -67,8 +67,6 @@ public class InteractionController {
 
     // Rastgele ve daha önce görülmemiş bir sonraki içeriği getir (Sonsuz Kaydırma
     // için)
-    // Rastgele ve daha önce görülmemiş bir sonraki içeriği getir (Sonsuz Kaydırma
-    // için)
     @GetMapping("/feed/next-random")
     public ResponseEntity<SummaryDto> getNextRandomContent(
             @RequestParam Long userId,

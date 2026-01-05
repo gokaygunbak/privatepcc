@@ -163,6 +163,12 @@ public class LlmController {
         return ResponseEntity.ok(summaryRepository.count());
     }
 
+    // Admin: Kategorilere göre içerik sayılarını getir
+    @GetMapping("/stats/topics")
+    public ResponseEntity<List<com.pcc.llm_service.dto.TopicStatsDto>> getTopicStats() {
+        return ResponseEntity.ok(summaryRepository.countSummariesByTopic());
+    }
+
     // --- Trends Page Endpoint ---
     @PostMapping("/feed/trends")
     public ResponseEntity<TrendsResponse> getTrendsFeed(@RequestBody TrendsRequest request) {

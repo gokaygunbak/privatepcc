@@ -70,9 +70,11 @@ const AdminPage = () => {
         try {
             const headers = { Authorization: `Bearer ${token}` };
 
-            // Topic'leri çek
-            const topicsRes = await axios.get('http://localhost:8080/api/llm/topics', { headers });
-            setTopics(topicsRes.data);
+            // Topic'leri ve İstatistiklerini çek
+            const topicsRes = await axios.get('http://localhost:8080/api/llm/stats/topics', { headers });
+            // İçerik sayısına göre azalan sırala
+            const sortedTopics = topicsRes.data.sort((a, b) => (b.contentCount || 0) - (a.contentCount || 0));
+            setTopics(sortedTopics);
 
             // Şikayet edilen içerikleri çek
             try {
@@ -215,14 +217,25 @@ const AdminPage = () => {
                         Admin Paneli
                     </Typography>
                 </Box>
-                <Button
-                    variant="outlined"
-                    startIcon={<ArrowBackIcon />}
-                    onClick={() => navigate('/trends')}
-                    sx={{ borderRadius: 2 }}
-                >
-                    Ana Sayfaya Dön
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        startIcon={<TrendingUpIcon />}
+                        onClick={handleStartAIProcessing}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        Yapay Zeka İşlemini Başlat
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<ArrowBackIcon />}
+                        onClick={() => navigate('/trends')}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        Ana Sayfaya Dön
+                    </Button>
+                </Box>
             </Box>
 
             {/* İstatistik Kartları */}
@@ -412,12 +425,13 @@ const AdminPage = () => {
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
                 📚 Kategoriler
             </Typography>
-            <TableContainer component={Paper} sx={{ boxShadow: 3 }}>
+            <TableContainer component={Paper} sx={{ boxShadow: 3, maxWidth: '800px', mx: 'auto' }}>
                 <Table>
                     <TableHead sx={{ bgcolor: 'primary.main' }}>
                         <TableRow>
                             <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
                             <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Kategori Adı</TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'right' }}>İçerik Sayısı</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -427,33 +441,19 @@ const AdminPage = () => {
                                     <Chip label={topic.topicId} size="small" color="primary" />
                                 </TableCell>
                                 <TableCell>{topic.name}</TableCell>
+                                <TableCell sx={{ textAlign: 'right' }}>
+                                    <Chip
+                                        label={topic.contentCount || 0}
+                                        size="small"
+                                        variant="outlined"
+                                        color={topic.contentCount > 0 ? "success" : "default"}
+                                    />
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </TableContainer>
-
-            {/* Gelecekte eklenebilecek özellikler */}
-            <Box sx={{ mt: 4, p: 3, bgcolor: 'grey.100', borderRadius: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" color="text.secondary">
-                        🚧 Geliştirme Aşamasında
-                    </Typography>
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        startIcon={<TrendingUpIcon />}
-                        onClick={handleStartAIProcessing}
-                    >
-                        Yapay Zeka İşlemini Başlat
-                    </Button>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                    • Kullanıcı yönetimi (ban, rol değiştirme)<br />
-                    • Detaylı istatistikler ve grafikler<br />
-                    • RSS kaynak yönetimi
-                </Typography>
-            </Box>
         </Box >
     );
 };

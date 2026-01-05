@@ -165,7 +165,7 @@ function SavedContentsPage() {
                 ) : (
                     <Grid container spacing={3}>
                         {savedContents.map((news) => (
-                            <Grid item xs={12} key={news.summaryId || news.contentId}>
+                            <Grid item xs={12} key={news.summaryId || news.contentId} sx= {{width: '100%'}}>
                                 <Card sx={{
                                     width: '100%',
                                     display: 'flex',

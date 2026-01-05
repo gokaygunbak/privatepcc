@@ -62,7 +62,7 @@ const MyFeed = () => {
             return;
         }
         fetchInitialContent(token, userId);
-    }, []);
+    }, [navigate]);
 
     const fetchInitialContent = async (token, userId) => {
         try {

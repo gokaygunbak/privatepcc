@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../components/MainLayout';
@@ -21,7 +21,15 @@ import AuthService from '../services/AuthService';
 const drawerWidth = 240;
 
 function NewsPage() {
+  const navigate = useNavigate();
   const [searchResults, setSearchResults] = useState([]);
+
+  useEffect(() => {
+    const token = AuthService.getCurrentToken();
+    if (!token) {
+      navigate("/");
+    }
+  }, [navigate]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   // Interaction states
@@ -132,7 +140,7 @@ function NewsPage() {
             </Typography>
             <Grid container spacing={3} alignItems="stretch">
               {searchResults.map((news) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={news.summaryId} sx={{ width: '100%' }}>
                   <Card sx={{
                     width: '100%',
                     display: 'flex',

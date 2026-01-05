@@ -235,8 +235,8 @@ public class UserPreferenceService {
             case LIKE -> 1.0;
             case SAVE -> 2.0;
             case CLICK -> 0.3;
-            case SHOW_LESS -> -0.7; // Özel işaret: %70 azalt
-            case NOT_INTERESTED -> -100.0; // Özel işaret: Sıfırla
+            case SHOW_LESS -> -0.7; // %70 azalt
+            case NOT_INTERESTED -> -100.0; // Sıfırla
             default -> 0.0;
         };
     }

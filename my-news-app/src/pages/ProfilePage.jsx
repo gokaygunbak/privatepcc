@@ -48,6 +48,15 @@ const ProfilePage = () => {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+    useEffect(() => {
+        const token = AuthService.getCurrentToken();
+        if (!token) {
+            navigate("/");
+            return;
+        }
+        // fetchProfile... (existing logic usually follows)
+    }, [navigate]);
     const [userTopics, setUserTopics] = useState([]);
     const [topicsLoading, setTopicsLoading] = useState(true);
     const [topicStats, setTopicStats] = useState([]);

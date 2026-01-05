@@ -16,7 +16,11 @@ const Login = () => {
 
         try {
             await AuthService.login(username, password);
-            navigate("/news");
+            if (AuthService.getCurrentToken()) {
+                navigate("/news");
+            } else {
+                setError("Giriş başarılı ancak token alınamadı.");
+            }
         } catch (err) {
             setError("Giriş başarısız! Bilgileri kontrol et.");
         }
@@ -46,7 +50,7 @@ const Login = () => {
                     }}
                 >
                     <Typography variant="h4" component="h1" gutterBottom fontWeight="bold" sx={{ color: '#0388a6' }}>
-                        Hoş Geldin 
+                        Hoş Geldin
                     </Typography>
                     <Typography variant="body1" sx={{ color: '#14231d', mb: 3 }}>
                         Haberlere erişmek için giriş yapmalısın.
@@ -126,7 +130,7 @@ const Login = () => {
                     </Typography>
 
                     <Typography variant="caption" display="block" sx={{ mt: 4, color: '#b0bec5' }}>
-                        © 2024 Personal Content Curator
+                        © Developed by Gökay & Berk
                     </Typography>
                 </Paper>
             </Container>
