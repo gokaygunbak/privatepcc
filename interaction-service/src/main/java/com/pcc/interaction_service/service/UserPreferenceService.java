@@ -48,7 +48,7 @@ public class UserPreferenceService {
 
         // Debug: Mevcut skorları da kontrol et
         List<UserTopicScore> existingScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
-        System.out.println("🔍 DEBUG - Mevcut skorlar: " + existingScores.stream()
+        System.out.println("DEBUG - Mevcut skorlar: " + existingScores.stream()
                 .map(s -> "Topic=" + s.getTopicId() + ",Skor=" + s.getScore())
                 .collect(java.util.stream.Collectors.joining(", ")));
 
@@ -67,12 +67,12 @@ public class UserPreferenceService {
         Set<Integer> keptTopics = new HashSet<>(oldSet);
         keptTopics.retainAll(newSet);
 
-        System.out.println("📊 Tercih Değişikliği - User=" + userId);
-        System.out.println("   Eski: " + oldTopicIds);
-        System.out.println("   Yeni: " + newTopicIds);
-        System.out.println("   ➕ Eklenen: " + addedTopics);
-        System.out.println("   ➖ Kaldırılan: " + removedTopics);
-        System.out.println("   ✓ Korunan: " + keptTopics);
+        System.out.println("Tercih Değişikliği - User=" + userId);
+        System.out.println("Eski: " + oldTopicIds);
+        System.out.println("Yeni: " + newTopicIds);
+        System.out.println("Eklenen: " + addedTopics);
+        System.out.println("Kaldırılan: " + removedTopics);
+        System.out.println("Korunan: " + keptTopics);
 
         // 5. Tercihleri güncelle (hepsini sil, yeniden ekle)
         preferenceRepository.deleteAllByUserId(userId);
@@ -89,18 +89,18 @@ public class UserPreferenceService {
         for (Integer topicId : removedTopics) {
             UserTopicScoreId scoreId = new UserTopicScoreId(userId, topicId);
             scoreRepository.deleteById(scoreId);
-            System.out.println("🗑️ Skor silindi: Topic=" + topicId);
+            System.out.println("Skor silindi: Topic=" + topicId);
         }
 
         // 7. Yeni eklenen topic'lere başlangıç puanı ver (SADECE skor yoksa!)
         // 7. Yeni eklenen topic'lere puan ekle (Her zaman +5 ekle, varsa üstüne koy)
         for (Integer topicId : addedTopics) {
-            System.out.println("➕ Topic=" + topicId + " tercih edildi. +5.0 puan ekleniyor.");
+            System.out.println("Topic=" + topicId + " tercih edildi. +5.0 puan ekleniyor.");
             updateUserTopicScore(userId, topicId, 5.0);
         }
 
         // 8. Korunan topic'lerin skorlarına DOKUNMA (mevcut skorları koru)
-        System.out.println("✅ İşlem tamamlandı. Korunan topic'lerin skorları değişmedi.");
+        System.out.println("İşlem tamamlandı. Korunan topic'lerin skorları değişmedi.");
     }
 
     // Etkileşimi Kaydet ve Puanla
@@ -117,7 +117,7 @@ public class UserPreferenceService {
             if (!existingInteractions.isEmpty()) {
                 // VARSA -> HEPSİNİ SİL (Cleanup + Unsave) + PUAN DÜŞ
                 interactionRepository.deleteAll(existingInteractions);
-                System.out.println("🗑️ Unsave işlemi: " + existingInteractions.size() + " interaction silindi.");
+                System.out.println("Unsave işlemi: " + existingInteractions.size() + " interaction silindi.");
 
                 // Topic ID belirle
                 Integer topicId = request.getTopicId();
@@ -125,7 +125,7 @@ public class UserPreferenceService {
                     try {
                         topicId = llmServiceClient.getTopicIdByContentId(request.getContentId());
                     } catch (Exception e) {
-                        System.err.println("⚠️ Topic ID alınamadı (Unsave): " + e.getMessage());
+                        System.err.println("Topic ID alınamadı (Unsave): " + e.getMessage());
                     }
                 }
 
@@ -135,9 +135,9 @@ public class UserPreferenceService {
                     if (scoreRepository.existsById(scoreId)) {
                         double scoreDeduct = -1.0 * getScoreByInteractionType(UserInteraction.InteractionType.SAVE);
                         updateUserTopicScore(request.getUserId(), topicId, scoreDeduct);
-                        System.out.println("📉 Puan düşüldü: " + scoreDeduct);
+                        System.out.println("Puan düşüldü: " + scoreDeduct);
                     } else {
-                        System.out.println("⚠️ Topic score bulunamadı (Topic=" + topicId + "), puan düşülmedi.");
+                        System.out.println(" Topic score bulunamadı (Topic=" + topicId + "), puan düşülmedi.");
                     }
                 }
 
@@ -159,10 +159,10 @@ public class UserPreferenceService {
             try {
                 // ContentId'den Summary'nin topic_id'sini çek
                 topicId = llmServiceClient.getTopicIdByContentId(request.getContentId());
-                System.out.println("🎯 Topic ID LLM Service'den alındı: " + topicId + " (ContentId: "
+                System.out.println("Topic ID LLM Service'den alındı: " + topicId + " (ContentId: "
                         + request.getContentId() + ")");
             } catch (Exception e) {
-                System.err.println("⚠️ Topic ID alınamadı: " + e.getMessage());
+                System.err.println("Topic ID alınamadı: " + e.getMessage());
             }
         }
 
@@ -171,7 +171,7 @@ public class UserPreferenceService {
             double scoreIncrement = getScoreByInteractionType(request.getInteractionType());
             updateUserTopicScore(request.getUserId(), topicId, scoreIncrement);
         } else {
-            System.out.println("⚠️ Topic ID bulunamadı, puanlama yapılmadı.");
+            System.out.println("Topic ID bulunamadı, puanlama yapılmadı.");
         }
     }
 
@@ -194,10 +194,10 @@ public class UserPreferenceService {
             // Eğer scoreDelta -0.7 ise -> %70 AZALT (0.3 ile çarp)
             if (scoreDelta == -100.0) {
                 newScore = 0.0;
-                System.out.println("⛔️ SKOR SIFIRLANDI (NOT_INTERESTED): User=" + userId + ", Topic=" + topicId);
+                System.out.println("SKOR SIFIRLANDI (NOT_INTERESTED): User=" + userId + ", Topic=" + topicId);
             } else if (scoreDelta == -0.7) {
                 newScore = currentScore * 0.3; // %70 azalt
-                System.out.println("📉 SKOR AZALTILDI (SHOW_LESS): " + currentScore + " -> " + newScore);
+                System.out.println("SKOR AZALTILDI (SHOW_LESS): " + currentScore + " -> " + newScore);
             } else {
                 newScore = currentScore + scoreDelta;
                 // Skorun eksiye düşmesini engelle
@@ -247,7 +247,7 @@ public class UserPreferenceService {
         List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
 
         if (userScores.isEmpty()) {
-            System.out.println("📭 Kullanıcı " + userId + " için hiç skor bulunamadı.");
+            System.out.println("Kullanıcı " + userId + " için hiç skor bulunamadı.");
             return List.of();
         }
 
@@ -261,8 +261,8 @@ public class UserPreferenceService {
                 .mapToDouble(UserTopicScore::getScore)
                 .sum();
 
-        // 4. Yüzdelikleri hesapla ve logla
-        System.out.println("📊 Kullanıcı " + userId + " için ağırlıklı dağılım:");
+        // 4. Yüzdelikleri hesapla ve
+        System.out.println("Kullanıcı " + userId + " için ağırlıklı dağılım:");
         for (UserTopicScore score : userScores) {
             double percentage = (score.getScore() / totalScore) * 100;
             System.out.println("   Topic " + score.getTopicId() + ": " +
@@ -274,7 +274,7 @@ public class UserPreferenceService {
         List<SummaryDto> allSummaries = llmServiceClient.getSummariesByTopics(topicIds);
 
         if (allSummaries.isEmpty()) {
-            System.out.println("📭 Bu topic'lere ait içerik bulunamadı.");
+            System.out.println("Bu topic'lere ait içerik bulunamadı.");
             return List.of();
         }
 
@@ -287,7 +287,7 @@ public class UserPreferenceService {
         List<SummaryDto> personalizedFeed = buildWeightedFeed(userScores, summariesByTopic, totalScore,
                 allSummaries.size());
 
-        System.out.println("✅ " + personalizedFeed.size() + " içerik ağırlıklı algoritma ile sıralandı.");
+        System.out.println(personalizedFeed.size() + " içerik ağırlıklı algoritma ile sıralandı.");
         return personalizedFeed;
     }
 
@@ -318,7 +318,7 @@ public class UserPreferenceService {
             if (topTopicSummaries != null && !topTopicSummaries.isEmpty()) {
                 result.add(topTopicSummaries.get(0));
                 topicIndices.put(topTopicId, 1);
-                System.out.println("🥇 İlk içerik: Topic " + topTopicId + " (En yüksek skor)");
+                System.out.println("İlk içerik: Topic " + topTopicId + " (En yüksek skor)");
             }
         }
 
@@ -401,7 +401,7 @@ public class UserPreferenceService {
                 .findByUserIdAndInteractionTypeOrderByCreatedAtDesc(userId, UserInteraction.InteractionType.SAVE);
 
         if (savedInteractions.isEmpty()) {
-            System.out.println("📭 Kullanıcı " + userId + " hiç içerik kaydetmemiş.");
+            System.out.println("Kullanıcı " + userId + " hiç içerik kaydetmemiş.");
             return List.of();
         }
 
@@ -410,7 +410,7 @@ public class UserPreferenceService {
                 .map(UserInteraction::getContentId)
                 .collect(java.util.stream.Collectors.toList());
 
-        System.out.println("📚 Kullanıcı " + userId + " için " + contentIds.size() + " kayıtlı içerik bulundu.");
+        System.out.println("Kullanıcı " + userId + " için " + contentIds.size() + " kayıtlı içerik bulundu.");
 
         // 3. LLM Service'den summary'leri çek
         List<SummaryDto> summaries = llmServiceClient.getSummariesByContentIds(contentIds);
@@ -438,7 +438,7 @@ public class UserPreferenceService {
                 .findByInteractionTypeOrderByCreatedAtDesc(UserInteraction.InteractionType.REPORT);
 
         if (reportInteractions.isEmpty()) {
-            System.out.println("📭 Hiç şikayet edilen içerik yok.");
+            System.out.println("Hiç şikayet edilen içerik yok.");
             return List.of();
         }
 
@@ -449,7 +449,7 @@ public class UserPreferenceService {
                 .distinct()
                 .collect(java.util.stream.Collectors.toList());
 
-        System.out.println("⚠️ " + contentIds.size() + " farklı içerik şikayet edilmiş.");
+        System.out.println(contentIds.size() + " farklı içerik şikayet edilmiş.");
 
         // 3. LLM Service'den summary'leri çek
         List<SummaryDto> summaries = llmServiceClient.getSummariesByContentIds(contentIds);
@@ -461,26 +461,26 @@ public class UserPreferenceService {
     // Admin: İçeriği ve İlişkili Tüm Verileri Sil
     @Transactional
     public void deleteContentCompletely(java.util.UUID contentId) {
-        System.out.println("🗑️ İçerik siliniyor: " + contentId);
+        System.out.println("İçerik siliniyor: " + contentId);
 
         // 1. Bu içeriğe ait tüm interaction'ları sil (LIKE, SAVE, REPORT)
         interactionRepository.deleteByContentId(contentId);
-        System.out.println("   ✓ Interaction'lar silindi");
+        System.out.println("Interaction'lar silindi");
 
         // 2. LLM Service'e içeriği silmesini söyle
         llmServiceClient.deleteContent(contentId);
-        System.out.println("   ✓ İçerik LLM Service'den silindi");
+        System.out.println("İçerik LLM Service'den silindi");
     }
 
     // Admin: Şikayeti Yoksay (Sadece REPORT interaction'larını sil)
     @Transactional
     public void dismissReport(java.util.UUID contentId) {
-        System.out.println("🛡️ Şikayet yoksayılıyor: " + contentId);
+        System.out.println("Şikayet yoksayılıyor: " + contentId);
         interactionRepository.deleteByContentIdAndInteractionType(contentId, UserInteraction.InteractionType.REPORT);
-        System.out.println("   ✓ REPORT interaction'ları silindi.");
+        System.out.println("REPORT interaction'ları silindi.");
     }
 
-    // Ağırlıklı Rastgele ve Görülmemiş İçerik Seçimi (Sonsuz Kaydırma İçin)
+    // Ağırlıklı Rastgele ve Görülmemiş İçerik Seçimi
     public SummaryDto getNextWeightedContent(Long userId, boolean forceTop) {
         // 1. Kullanıcının skorlarını çek
         List<UserTopicScore> userScores = scoreRepository.findByUserIdOrderByScoreDesc(userId);
@@ -492,17 +492,17 @@ public class UserPreferenceService {
 
         if (userScores.isEmpty() || totalScore <= 0) {
             System.out.println(
-                    "ℹ️ Kullanıcı skoru yok veya toplam skor 0 (Total=" + totalScore + "), rastgele seçim yapılacak.");
+                    "Kullanıcı skoru yok veya toplam skor 0 (Total=" + totalScore + "), rastgele seçim yapılacak.");
             // targetTopicId = null kalır -> Global Random
         } else if (forceTop) {
             // En yüksek skorlu konuyu zorla
             targetTopicId = userScores.get(0).getTopicId();
-            System.out.println("🥇 Force Top aktif: Topic " + targetTopicId + " seçildi.");
+            System.out.println("Force Top aktif: Topic " + targetTopicId + " seçildi.");
         } else {
             // Ağırlıklı rastgele seçim yap
             java.util.Random random = new java.util.Random();
             targetTopicId = selectWeightedTopic(userScores, totalScore, random);
-            System.out.println("🎲 Ağırlıklı seçim: Topic " + targetTopicId + " (Total Score: " + totalScore + ")");
+            System.out.println("Ağırlıklı seçim: Topic " + targetTopicId + " (Total Score: " + totalScore + ")");
         }
 
         // 3. LLM Service'den bu topic için içerik iste
@@ -514,7 +514,7 @@ public class UserPreferenceService {
         // 4. Fallback: Eğer seçilen topic'te içerik kalmadıysa veya topic null ise
         if (summary == null) {
             System.out.println(
-                    "⚠️ Topic " + targetTopicId + " için içerik kalmadı veya bulunamadı. Fallback: Global Random.");
+                    "Topic " + targetTopicId + " için içerik kalmadı veya bulunamadı. Fallback: Global Random.");
             // TopicID olmadan (null) global random iste
             summary = llmServiceClient.getRandomUnseenContent(userId, null);
         }
@@ -561,20 +561,20 @@ public class UserPreferenceService {
     // Kullanıcının Tüm Verilerini Sıfırla (Reset Algorithm)
     @Transactional
     public void resetUserAlgorithm(Long userId) {
-        System.out.println("🧨 ALGORİTMA SIFIRLANIYOR: User=" + userId);
+        System.out.println("ALGORİTMA SIFIRLANIYOR: User=" + userId);
 
         // 1. Tüm Interaction'ları sil
         interactionRepository.deleteByUserId(userId);
-        System.out.println("   ✓ Interaction'lar silindi.");
+        System.out.println("Interaction'lar silindi.");
 
         // 2. Tüm Topic Skorlarını sil
         scoreRepository.deleteByUserId(userId);
-        System.out.println("   ✓ Skorlar silindi.");
+        System.out.println("Skorlar silindi.");
 
         // 3. Tüm Tercihleri sil
         preferenceRepository.deleteAllByUserId(userId);
-        System.out.println("   ✓ Tercihler silindi.");
+        System.out.println("Tercihler silindi.");
 
-        System.out.println("✅ Kullanıcı verileri tamamen temizlendi.");
+        System.out.println("Kullanıcı verileri tamamen temizlendi.");
     }
 }

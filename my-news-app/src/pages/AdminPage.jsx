@@ -49,6 +49,7 @@ const AdminPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [deleting, setDeleting] = useState({});
+    const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
         // Admin kontrolü
@@ -101,7 +102,14 @@ const AdminPage = () => {
                 const summaryCountRes = await axios.get('http://localhost:8080/api/llm/stats/summary-count', { headers });
                 contentCount = summaryCountRes.data;
             } catch (e) {
-                console.log('Özet sayısı alınamadı:', e);
+                console.log('İçerik sayısı alınamadı:', e);
+            }
+
+            try {
+                const pendingCountRes = await axios.get('http://localhost:8080/api/llm/stats/pending-count', { headers });
+                setPendingCount(pendingCountRes.data);
+            } catch (e) {
+                console.log('Bekleyen içerik sayısı alınamadı:', e);
             }
 
             try {
@@ -217,7 +225,12 @@ const AdminPage = () => {
                         Admin Paneli
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Box sx={{ textAlign: 'right', mr: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Bekleyen İçerik Sayısı: <strong>{pendingCount}</strong>
+                        </Typography>
+                    </Box>
                     <Button
                         variant="contained"
                         color="secondary"
@@ -225,7 +238,7 @@ const AdminPage = () => {
                         onClick={handleStartAIProcessing}
                         sx={{ borderRadius: 2 }}
                     >
-                        Yapay Zeka İşlemini Başlat
+                        Özetleme İşlemini Başlat
                     </Button>
                     <Button
                         variant="outlined"

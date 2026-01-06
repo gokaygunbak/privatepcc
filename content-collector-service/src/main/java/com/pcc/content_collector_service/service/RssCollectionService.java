@@ -208,7 +208,7 @@ public class RssCollectionService {
             allResults.addAll(rssResults);
         }
 
-        System.out.println("✅ Toplam sonuç: " + allResults.size() + " haber");
+        System.out.println("Toplam sonuç: " + allResults.size() + " haber");
 
         return allResults;
     }

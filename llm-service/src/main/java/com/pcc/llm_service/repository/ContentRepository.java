@@ -9,4 +9,6 @@ import java.util.UUID;
 @Repository
 public interface ContentRepository extends JpaRepository<Content, UUID> {
     List<Content> findByFetchStatus(String status);
+
+    long countByFetchStatus(String status);
 }

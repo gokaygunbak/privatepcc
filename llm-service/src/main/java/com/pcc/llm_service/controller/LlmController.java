@@ -157,10 +157,15 @@ public class LlmController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    // Admin: Toplam özet (summary) sayısını getir
     @GetMapping("/stats/summary-count")
     public ResponseEntity<Long> getSummaryCount() {
         return ResponseEntity.ok(summaryRepository.count());
+    }
+
+    // Admin: Bekleyen (PENDING) içerik sayısını getir
+    @GetMapping("/stats/pending-count")
+    public ResponseEntity<Long> getPendingContentCount() {
+        return ResponseEntity.ok(contentRepository.countByFetchStatus("PENDING"));
     }
 
     // Admin: Kategorilere göre içerik sayılarını getir

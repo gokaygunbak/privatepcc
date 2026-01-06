@@ -23,4 +23,8 @@ public interface UserTopicScoreRepository extends JpaRepository<UserTopicScore, 
 
     // Alias for consistency
     void deleteByUserId(Long userId);
+
+    // Tüm kullanıcıların topic skorlarını topla ve en yüksekten düşüğe sırala
+    @Query("SELECT u.topicId, SUM(u.score) as totalScore FROM UserTopicScore u GROUP BY u.topicId ORDER BY totalScore DESC")
+    List<Object[]> findTopTopicsByTotalScore(org.springframework.data.domain.Pageable pageable);
 }

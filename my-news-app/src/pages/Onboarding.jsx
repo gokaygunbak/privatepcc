@@ -12,23 +12,31 @@ import {
     Alert,
     CircularProgress,
     TextField,
-    InputAdornment
+    InputAdornment,
+    Divider // [NEW]
 } from '@mui/material';
 import {
     Check as CheckIcon,
     Search as SearchIcon,
-    ArrowForward as ArrowForwardIcon
+    ArrowForward as ArrowForwardIcon,
+    TrendingUp as TrendingUpIcon // [NEW]
 } from '@mui/icons-material';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell // [NEW]
+} from 'recharts';
 import AuthService from '../services/AuthService';
 
 function Onboarding() {
     const [topics, setTopics] = useState([]);
     const [selectedTopicIds, setSelectedTopicIds] = useState([]);
+    const [popularTopics, setPopularTopics] = useState([]); // [NEW]
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const navigate = useNavigate();
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300']; // [NEW]
 
     useEffect(() => {
         const token = AuthService.getCurrentToken();
@@ -37,12 +45,27 @@ function Onboarding() {
             return;
         }
         fetchTopicsAndPreferences();
+        fetchPopularTopics(token); // [NEW]
     }, []);
+
+    // [NEW]
+    const fetchPopularTopics = async (token) => {
+        try {
+            const response = await axios.get('http://localhost:8080/api/interactions/stats/popular-topics', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data) {
+                setPopularTopics(response.data);
+            }
+        } catch (error) {
+            console.error("Popüler konular yüklenirken hata:", error);
+        }
+    };
 
     const fetchTopicsAndPreferences = async () => {
         const token = AuthService.getCurrentToken();
         const userId = AuthService.getCurrentUserId();
-        
+
         try {
             // 1. Tüm konuları çek
             const topicsResponse = await axios.get('http://localhost:8080/api/interactions/topics', {
@@ -55,7 +78,7 @@ function Onboarding() {
                 try {
                     const prefsResponse = await axios.get(`http://localhost:8080/api/interactions/preferences/${userId}`, {
                         headers: { Authorization: `Bearer ${token}` }
-            });
+                    });
                     // Mevcut tercihleri seçili olarak işaretle
                     if (prefsResponse.data && prefsResponse.data.length > 0) {
                         const existingTopicIds = prefsResponse.data.map(topic => topic.topicId);
@@ -155,8 +178,8 @@ function Onboarding() {
                         }}>
                             İlgi Alanlarını Seç
                         </Typography>
-                        <Typography variant="h6" color="text.secondary">
-                            {selectedTopicIds.length > 0 
+                        <Typography variant="h6" color={selectedTopicIds.length > 0 ? "text.secondary" : "secondary"}>
+                            {selectedTopicIds.length > 0
                                 ? `${selectedTopicIds.length} alan seçili. Ekle veya çıkar.`
                                 : "Sana en uygun haberleri getirebilmemiz için neleri sevdiğini söyle."
                             }
@@ -230,6 +253,43 @@ function Onboarding() {
                                 )}
                             </Box>
 
+                            {/* [NEW] POPÜLER KATEGORİLER (BAR CHARTS) */}
+                            {popularTopics.length > 0 && (
+                                <Box sx={{ mt: 4, mb: 2 }}>
+                                    <Divider sx={{ mb: 3 }} />
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                        <TrendingUpIcon color="secondary" />
+                                        <Typography variant="h6" color="secondary">
+                                            Kullanıcıların En Çok Sevdiği 5 Kategori
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ height: 250, width: '100%' }}>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart
+                                                data={popularTopics}
+                                                layout="vertical"
+                                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                                <XAxis type="number" hide />
+                                                <YAxis dataKey="topicName" type="category" width={100} tick={{ fill: '#e0e0e0' }} />
+                                                <Tooltip
+                                                    cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                                                    contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px' }}
+                                                    itemStyle={{ color: '#fff' }}
+                                                    formatter={(value) => [`${value} Puan`, 'Skor']}
+                                                />
+                                                <Bar dataKey="score" fill="#8884d8" radius={[0, 10, 10, 0]}>
+                                                    {popularTopics.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </Box>
+                                </Box>
+                            )}
+
                             <Box sx={{ mt: 5, display: 'flex', justifyContent: 'space-between' }}>
                                 <Button
                                     variant="outlined"
@@ -257,7 +317,7 @@ function Onboarding() {
                                         px: 4,
                                         py: 1.5,
                                         fontWeight: 'bold',
-                                        background: selectedTopicIds.length === 0 
+                                        background: selectedTopicIds.length === 0
                                             ? 'linear-gradient(45deg, #757575 30%, #616161 90%)'
                                             : 'linear-gradient(45deg, #673AB7 30%, #512DA8 90%)',
                                     }}

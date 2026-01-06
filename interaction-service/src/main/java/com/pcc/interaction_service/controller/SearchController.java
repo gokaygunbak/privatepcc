@@ -121,8 +121,8 @@ public class SearchController {
         private String summaryText;
         private String generatedTags;
         private java.time.LocalDateTime createdAt;
-        private ContentDTO content; // İlişkili içerik
-        private Integer topicId; // Frontend interaction için gerekebilir, aslında ContentDTO'da olmalı
+        private ContentDTO content;
+        private Integer topicId;
 
         public UUID getSummaryId() {
             return summaryId;

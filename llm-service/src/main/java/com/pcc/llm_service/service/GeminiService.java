@@ -190,7 +190,7 @@ public class GeminiService {
                     history.setUserId(userId);
                     history.setContentId(summary.getContent().getContentId());
                     viewHistoryRepository.save(history);
-                    System.out.println("👁️ İçerik görüldü olarak işaretlendi: User=" + userId + ", Content="
+                    System.out.println("İçerik görüldü olarak işaretlendi: User=" + userId + ", Content="
                             + summary.getContent().getContentId() + ", Topic="
                             + (topicId != null ? topicId : "Random"));
                 }
@@ -199,7 +199,7 @@ public class GeminiService {
             }
         } else {
             System.out.println(
-                    "🚫 Kullanıcı " + userId + " için " + (topicId != null ? "Topic " + topicId + " konusunda " : "")
+                    "Kullanıcı " + userId + " için " + (topicId != null ? "Topic " + topicId + " konusunda " : "")
                             + "gösterilecek yeni içerik kalmadı!");
         }
 

@@ -69,13 +69,13 @@ const ProfilePage = () => {
         const userId = AuthService.getCurrentUserId();
         const token = AuthService.getCurrentToken();
         try {
-            await axios.post(`http://localhost:8080/api/interactions/reset?userId=${userId}`, {}, {
+            await axios.delete(`http://localhost:8080/api/interactions/reset?userId=${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setOpenResetDialog(false);
             // Onboarding sayfasına yönlendir
             navigate('/onboarding', { replace: true });
-            window.location.reload(); // State'leri temizlemek için reload iyi olabilir
+            window.location.reload();
         } catch (error) {
             console.error("Sıfırlama hatası:", error);
             setSnackbar({ open: true, message: 'Sıfırlama işlemi başarısız oldu.', severity: 'error' });

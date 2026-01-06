@@ -11,6 +11,12 @@ import com.pcc.interaction_service.service.UserPreferenceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.pcc.interaction_service.dto.TopicScoreDto;
+import com.pcc.interaction_service.repository.UserTopicScoreRepository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import java.util.stream.Collectors;
+import java.util.Map;
 import java.util.List;
 
 @RestController
@@ -20,13 +26,16 @@ public class InteractionController {
     private final UserPreferenceService preferenceService;
     private final LlmServiceClient llmServiceClient;
     private final UserInteractionRepository interactionRepository;
+    private final UserTopicScoreRepository userTopicScoreRepository;
 
     public InteractionController(UserPreferenceService preferenceService,
             LlmServiceClient llmServiceClient,
-            UserInteractionRepository interactionRepository) {
+            UserInteractionRepository interactionRepository,
+            UserTopicScoreRepository userTopicScoreRepository) {
         this.preferenceService = preferenceService;
         this.llmServiceClient = llmServiceClient;
         this.interactionRepository = interactionRepository;
+        this.userTopicScoreRepository = userTopicScoreRepository;
     }
 
     // Tüm Konuları Listele (Kullanıcı seçim yapsın diye)
@@ -65,8 +74,7 @@ public class InteractionController {
         return ResponseEntity.ok(preferenceService.getPersonalizedFeed(userId));
     }
 
-    // Rastgele ve daha önce görülmemiş bir sonraki içeriği getir (Sonsuz Kaydırma
-    // için)
+    // Rastgele ve daha önce görülmemiş bir sonraki içeriği getir
     @GetMapping("/feed/next-random")
     public ResponseEntity<SummaryDto> getNextRandomContent(
             @RequestParam Long userId,
@@ -140,13 +148,41 @@ public class InteractionController {
     }
 
     // Kullanıcının Algoritmasını Sıfırla (Danger Zone)
-    @PostMapping("/reset")
-    public ResponseEntity<String> resetAlgorithm(@RequestParam Long userId) {
-        try {
-            preferenceService.resetUserAlgorithm(userId);
-            return ResponseEntity.ok("Algoritma sıfırlandı.");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Sıfırlama hatası: " + e.getMessage());
+    @DeleteMapping("/reset")
+    @Transactional
+    public ResponseEntity<String> resetUserAlgorithm(@RequestParam Long userId) {
+        userTopicScoreRepository.deleteByUserId(userId);
+        interactionRepository.deleteByUserId(userId); // Changed from userInteractionRepository to interactionRepository
+        return ResponseEntity.ok("Algoritma sıfırlandı.");
+    }
+
+    @GetMapping("/stats/popular-topics")
+    public ResponseEntity<List<TopicScoreDto>> getPopularTopics() {
+        // 1. En yüksek skorlu 5 topic'i çek (ID ve Total Score)
+        List<Object[]> results = userTopicScoreRepository.findTopTopicsByTotalScore(
+                PageRequest.of(0, 5));
+
+        if (results.isEmpty()) {
+            return ResponseEntity.ok(List.of());
         }
+
+        // 2. Topic İsimlerini LLM Service'den çek
+        List<com.pcc.interaction_service.dto.TopicDto> allTopics = llmServiceClient.getAllTopics();
+        Map<Integer, String> topicNameMap = allTopics.stream()
+                .collect(Collectors.toMap(
+                        com.pcc.interaction_service.dto.TopicDto::getTopicId,
+                        com.pcc.interaction_service.dto.TopicDto::getName));
+
+        // 3. DTO'ları oluştur
+        List<TopicScoreDto> dtos = results.stream().map(row -> {
+            Integer topicId = (Integer) row[0];
+            Double totalScore = (Double) row[1];
+            String topicName = topicNameMap.getOrDefault(topicId, "Bilinmeyen Kategori");
+
+            // Percentage şimdilik 0
+            return new TopicScoreDto(topicId, topicName, totalScore, 0.0);
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
     }
 }
